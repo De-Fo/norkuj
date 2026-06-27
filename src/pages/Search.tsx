@@ -48,12 +48,12 @@ export function SearchPage() {
       return
     }
 
-    const { data, error } = await supabase.rpc('search_listings_with_transit', {
-      p_line: f.transitLine,
-      p_max_price: f.maxPrice,
-      p_property_type: f.propertyType ?? null,
-      p_bbox: b ?? null,
-    })
+      const { data, error } = await (supabase.rpc as any)('search_listings_with_transit', {
+        p_line: f.transitLine,
+        p_max_price: f.maxPrice,
+        p_property_type: f.propertyType ?? null,
+        p_bbox: b ?? null,
+})
 
     if (error) { console.error(error); return }
     setListings((data ?? []) as ListingSearchResult[])

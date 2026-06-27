@@ -23,9 +23,9 @@ export function AuthPage() {
         options: { data: { display_name: displayName, phone } },
       })
       if (error) { setMessage({ type: 'error', text: error.message }); setLoading(false); return }
-      if (data.user) {
+      if (data?.user) {
         await supabase.from('profiles').insert({
-          id: data.user.id,
+          id: data.user!.id,
           display_name: displayName,
           phone,
           email_verified: false,
@@ -50,7 +50,7 @@ export function AuthPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 w-full max-w-sm">
         <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Norkuj 🏠</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Norkuj</h1>
           <p className="text-sm text-gray-500 mt-1">Pronájem bez realitky</p>
         </div>
 
