@@ -17,7 +17,7 @@ const PRAGUE_CENTER: [number, number] = [14.4208, 50.0880]
 export function Map({ listings, highlightedId, onMarkerClick, onBoundsChange }: MapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
-  const markersRef = useRef<Map<string, maplibregl.Marker>>(new Map())
+  const markersRef = useRef<globalThis.Map<string, maplibregl.Marker>>(new globalThis.Map())
 
   // Init map once
   useEffect(() => {
