@@ -1,8 +1,7 @@
-// ─── Database row types ───────────────────────────────────────────────────────
-
 export type PropertyType = '1+kk' | '1+1' | '2+kk' | '2+1' | '3+kk' | '3+1' | '4+kk' | '4+1' | 'atypical'
 export type ListingStatus = 'draft' | 'pending_review' | 'published' | 'rented' | 'rejected' | 'deleted'
 export type TransitType = 'metro' | 'tram' | 'bus' | 'train'
+export type TransitStatus = 'green' | 'yellow' | 'red' | 'grey'
 
 export interface Profile {
   id: string
@@ -40,7 +39,6 @@ export interface Listing {
   address_city: string
   address_district: string | null
   address_zip: string | null
-  // location stored as PostGIS geography — returned as {lat, lng} from RPC
   image_paths: string[]
   status: ListingStatus
   created_at: string
@@ -57,10 +55,6 @@ export interface PidStation {
   lines: string[]
   is_active: boolean
 }
-
-// ─── RPC result type (from search_listings_with_transit) ──────────────────────
-
-export type TransitStatus = 'green' | 'yellow' | 'red' | 'grey'
 
 export interface ListingSearchResult {
   listing_id: string
@@ -79,20 +73,19 @@ export interface ListingSearchResult {
   transit_status: TransitStatus
 }
 
-// ─── Search filter state ──────────────────────────────────────────────────────
-
+// Multi-line: array of selected lines
 export interface SearchFilters {
-  transitLine: string | null       // e.g. 'A', 'B', 'C', '22'
-  maxPrice: number                 // 0 = no limit
+  transitLines: string[]       // e.g. ['A', '22'] — multiple lines
+  maxPrice: number
   propertyType: PropertyType | null
-  minArea: number                  // 0 = no limit
+  minArea: number
   furnished: boolean | null
   petsAllowed: boolean | null
   parking: boolean | null
 }
 
 export const DEFAULT_FILTERS: SearchFilters = {
-  transitLine: null,
+  transitLines: [],
   maxPrice: 0,
   propertyType: null,
   minArea: 0,
@@ -100,8 +93,6 @@ export const DEFAULT_FILTERS: SearchFilters = {
   petsAllowed: null,
   parking: null,
 }
-
-// ─── Minimal Database type for supabase client ───────────────────────────────
 
 export type Database = {
   public: {

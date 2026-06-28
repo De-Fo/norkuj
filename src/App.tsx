@@ -3,6 +3,10 @@ import type { User } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
 import { SearchPage } from './pages/Search'
 import { AuthPage } from './pages/Auth'
+import { CreateListingPage } from './pages/CreateListing'
+import { Wordmark } from './components/Wordmark'
+import type { SearchFilters } from './lib/types'
+import { DEFAULT_FILTERS } from './lib/types'
 
 type Route = 'search' | 'auth' | 'create'
 
@@ -10,6 +14,13 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null)
   const [route, setRoute] = useState<Route>('search')
   const [authLoading, setAuthLoading] = useState(true)
+  const [filters, setFilters] = useState<SearchFilters>(DEFAULT_FILTERS)
+  const [showMap, setShowMap] = useState(true)
+
+  useEffect(() => {
+    // On mobile default to list view
+    if (window.innerWidth < 768) setShowMap(false)
+  }, [])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -23,59 +34,86 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [])
 
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
+  if (authLoading) return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{
+        width: 22, height: 22, borderRadius: '50%',
+        border: '2px solid #2563eb', borderTopColor: 'transparent',
+        animation: 'spin 0.7s linear infinite',
+      }} />
+    </div>
+  )
 
   if (route === 'auth') return <AuthPage />
 
   return (
-    <div className="flex flex-col h-screen">
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden' }}>
+
       {/* Topbar */}
-      <header className="h-11 bg-white border-b border-gray-200 flex items-center justify-between px-4 shrink-0 z-10">
-        <button onClick={() => setRoute('search')} className="font-bold text-blue-700 text-base">
-          Norkuj 🏠
+      <header style={{
+        height: 48, flexShrink: 0,
+        background: 'var(--c-surface)', borderBottom: '1px solid var(--c-border)',
+        display: 'flex', alignItems: 'center', padding: '0 16px',
+        justifyContent: 'space-between',
+      }}>
+        <button onClick={() => setRoute('search')}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+          <Wordmark size="md" />
         </button>
-        <nav className="flex items-center gap-3">
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {user ? (
             <>
-              <button
-                onClick={() => setRoute('create')}
-                className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors"
-              >
+              <button onClick={() => setRoute('create')} style={{
+                padding: '6px 14px', background: 'var(--c-text)', color: 'white',
+                border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 500, cursor: 'pointer',
+              }}>
                 + Přidat inzerát
               </button>
-              <button
-                onClick={() => supabase.auth.signOut()}
-                className="text-xs text-gray-500 hover:text-gray-800"
-              >
+              <button onClick={() => supabase.auth.signOut()} style={{
+                padding: '6px 11px', background: 'transparent', color: 'var(--c-muted)',
+                border: '1px solid var(--c-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer',
+              }}>
                 Odhlásit
               </button>
             </>
           ) : (
-            <button
-              onClick={() => setRoute('auth')}
-              className="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Přihlásit se
-            </button>
+            <>
+              <button onClick={() => setRoute('auth')} style={{
+                padding: '6px 11px', background: 'transparent', color: 'var(--c-muted)',
+                border: '1px solid var(--c-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer',
+              }}>
+                Přihlásit
+              </button>
+              <button onClick={() => setRoute('auth')} style={{
+                padding: '6px 14px', background: 'var(--c-text)', color: 'white',
+                border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 500, cursor: 'pointer',
+              }}>
+                Registrovat
+              </button>
+            </>
           )}
-        </nav>
+        </div>
       </header>
 
-      {/* Page content */}
-      <main className="flex-1 overflow-hidden">
-        {route === 'search' && <SearchPage />}
+      {/* Main */}
+      <main style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
+        {route === 'search' && (
+          <SearchPage
+            filters={filters}
+            onChange={setFilters}
+            showMap={showMap}
+            onToggleMap={() => setShowMap(v => !v)}
+          />
+        )}
         {route === 'create' && (
-          <div className="flex items-center justify-center h-full text-gray-400">
-            Formulář pro přidání inzerátu — bude doplněn (Phase 2)
-          </div>
+          <CreateListingPage onDone={() => setRoute('search')} />
         )}
       </main>
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   )
 }
