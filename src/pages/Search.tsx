@@ -6,6 +6,7 @@ import { Map } from '../components/Map'
 import { FilterPanel } from '../components/FilterPanel'
 
 type BBox = { west: number; south: number; east: number; north: number }
+const STATUS_RANK = { green: 0, yellow: 1, red: 2, grey: 3 } as const
 
 interface Props {
   filters: SearchFilters
@@ -23,17 +24,24 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap }: Props) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const fetchListings = useCallback(async (f: SearchFilters, b: BBox | null) => {
-    // No transit lines selected — simple query
+    // ── No transit line selected: plain filtered query ──
     if (f.transitLines.length === 0) {
       let q = supabase.from('listings')
         .select('id,title,price_total_czk,property_type,area_sqm,address_district,available_from,image_paths')
         .eq('status', 'published')
+
       if (f.maxPrice > 0) q = q.lte('price_total_czk', f.maxPrice)
-      if (f.propertyType) q = q.eq('property_type', f.propertyType)
+      if (f.minArea > 0) q = q.gte('area_sqm', f.minArea)
+      if (f.propertyTypes.length > 0) q = q.in('property_type', f.propertyTypes)
+      if (f.districts.length > 0) q = q.in('address_district', f.districts)
       if (f.furnished) q = q.eq('furnished', true)
       if (f.petsAllowed) q = q.eq('pets_allowed', true)
       if (f.parking) q = q.eq('parking', true)
-      const { data } = await q.order('price_total_czk').limit(100)
+      if (f.balcony) q = q.eq('balcony', true)
+
+      const { data, error } = await q.order('price_total_czk').limit(150)
+      if (error) { console.error(error); setListings([]); return }
+
       setListings((data ?? []).map((l: any) => ({
         ...l, listing_id: l.id, lat: 0, lng: 0,
         nearest_station_name: '—', nearest_station_line: '—',
@@ -42,20 +50,18 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap }: Props) {
       return
     }
 
-    // Multiple lines: run one RPC per line, merge, deduplicate keeping best status
-    const STATUS_RANK = { green: 0, yellow: 1, red: 2, grey: 3 }
+    // ── One or more transit lines: run RPC per line, merge keeping best status ──
     const results = await Promise.all(
       f.transitLines.map(line =>
         (supabase.rpc as any)('search_listings_with_transit', {
           p_line: line,
           p_max_price: f.maxPrice,
-          p_property_type: f.propertyType ?? null,
+          p_property_type: null, // filtered client-side below for multi-type support
           p_bbox: b ?? null,
         }).then((r: any) => r.data ?? [])
       )
     )
 
-    // Merge: keep best (lowest rank) transit_status per listing
     const merged = new globalThis.Map<string, ListingSearchResult>()
     for (const batch of results) {
       for (const item of batch as ListingSearchResult[]) {
@@ -66,12 +72,30 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap }: Props) {
       }
     }
 
-    // Sort: green → yellow → red → grey, then price
-    const sorted = [...merged.values()].sort((a, b) =>
-      STATUS_RANK[a.transit_status] - STATUS_RANK[b.transit_status] ||
-      a.price_total_czk - b.price_total_czk
-    )
-    setListings(sorted)
+    let arr = [...merged.values()]
+
+    // Client-side filters not covered by the RPC (multi-type, multi-district, area, amenities)
+    if (f.propertyTypes.length > 0) arr = arr.filter(l => f.propertyTypes.includes(l.property_type))
+    if (f.districts.length > 0) arr = arr.filter(l => l.address_district && f.districts.includes(l.address_district))
+    if (f.minArea > 0) arr = arr.filter(l => l.area_sqm >= f.minArea)
+
+    // Amenity filters require a fetch since RPC doesn't return them — fetch matching ids if any amenity active
+    if (f.furnished || f.petsAllowed || f.parking || f.balcony) {
+      const ids = arr.map(l => l.listing_id)
+      if (ids.length > 0) {
+        let aq = supabase.from('listings').select('id').in('id', ids)
+        if (f.furnished) aq = aq.eq('furnished', true)
+        if (f.petsAllowed) aq = aq.eq('pets_allowed', true)
+        if (f.parking) aq = aq.eq('parking', true)
+        if (f.balcony) aq = aq.eq('balcony', true)
+        const { data: matchedIds } = await aq
+        const allowSet = new Set((matchedIds ?? []).map((r: any) => r.id))
+        arr = arr.filter(l => allowSet.has(l.listing_id))
+      }
+    }
+
+    arr.sort((a, b) => STATUS_RANK[a.transit_status] - STATUS_RANK[b.transit_status] || a.price_total_czk - b.price_total_czk)
+    setListings(arr)
   }, [])
 
   useEffect(() => {
@@ -94,7 +118,6 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap }: Props) {
   return (
     <div style={{ display: 'flex', flex: 1, overflow: 'hidden', height: '100%' }}>
 
-      {/* Map — hidden on mobile when showMap=false */}
       {showMap && (
         <div style={{ flex: 1, position: 'relative', minWidth: 0 }}>
           <Map
@@ -102,29 +125,20 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap }: Props) {
             highlightedId={highlightedId}
             onMarkerClick={handleMarkerClick}
             onBoundsChange={setBbox}
-            // Add the missing required props below:
             activeLines={filters.transitLines}
-            activeDistricts={filters.districts || []} // Adjust property name to match your SearchFilters type
+            activeDistricts={filters.districts}
           />
         </div>
       )}
 
-      {/* List pane */}
       <div style={{
         width: showMap ? '50%' : '100%',
         display: 'flex', flexDirection: 'column',
         borderLeft: showMap ? '1px solid var(--c-border)' : 'none',
         background: 'var(--c-bg)', overflow: 'hidden', flexShrink: 0,
       }}>
-        {/* Filter panel above list */}
-        <FilterPanel
-          filters={filters}
-          onChange={onChange}
-          resultCount={listings.length}
-          loading={loading}
-        />
+        <FilterPanel filters={filters} onChange={onChange} resultCount={listings.length} loading={loading} />
 
-        {/* Mobile map toggle */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
           padding: '6px 12px', borderBottom: '1px solid var(--c-border)',
@@ -138,7 +152,6 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap }: Props) {
           </button>
         </div>
 
-        {/* Cards */}
         <div ref={listRef} style={{ flex: 1, overflowY: 'auto', padding: 10 }}>
           {loading && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
