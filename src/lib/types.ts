@@ -1,4 +1,4 @@
-export type PropertyType = '1+kk' | '1+1' | '2+kk' | '2+1' | '3+kk' | '3+1' | '4+kk' | '4+1' | 'atypical'
+export type PropertyType = '1+kk' | '1+1' | '2+kk' | '2+1' | '3+kk' | '3+1' | '4+kk' | '4+1' | 'atypical' | 'pokoj'
 export type ListingStatus = 'draft' | 'pending_review' | 'published' | 'rented' | 'rejected' | 'deleted'
 export type TransitType = 'metro' | 'tram' | 'bus' | 'train'
 export type TransitStatus = 'green' | 'yellow' | 'red' | 'grey'
@@ -73,25 +73,52 @@ export interface ListingSearchResult {
   transit_status: TransitStatus
 }
 
-// Multi-line: array of selected lines
+// ── Filter state ─────────────────────────────────────────────
+// Multi-select where combining makes sense, single where it doesn't
 export interface SearchFilters {
-  transitLines: string[]       // e.g. ['A', '22'] — multiple lines
-  maxPrice: number
-  propertyType: PropertyType | null
-  minArea: number
-  furnished: boolean | null
-  petsAllowed: boolean | null
-  parking: boolean | null
+  transitLines: string[]          // multi: ['A', '22'] — best status wins per listing
+  propertyTypes: PropertyType[]   // multi: ['2+kk', '3+kk'] — OR logic
+  districts: string[]             // multi: ['Vinohrady', 'Žižkov'] — OR logic
+  maxPrice: number                // single: upper bound, 0 = no limit
+  minArea: number                 // single: lower bound, 0 = no limit
+  furnished: boolean              // toggle
+  petsAllowed: boolean            // toggle
+  parking: boolean                // toggle
+  balcony: boolean                // toggle
 }
 
 export const DEFAULT_FILTERS: SearchFilters = {
   transitLines: [],
+  propertyTypes: [],
+  districts: [],
   maxPrice: 0,
-  propertyType: null,
   minArea: 0,
-  furnished: null,
-  petsAllowed: null,
-  parking: null,
+  furnished: false,
+  petsAllowed: false,
+  parking: false,
+  balcony: false,
+}
+
+export const PRAGUE_DISTRICTS = [
+  'Praha 1','Praha 2','Praha 3','Praha 4','Praha 5',
+  'Praha 6','Praha 7','Praha 8','Praha 9','Praha 10',
+  'Vinohrady','Žižkov','Holešovice','Smíchov','Dejvice',
+  'Bubeneč','Nusle','Vršovice','Košíře','Karlín',
+  'Letňany','Chodov','Modřany','Braník','Prosek',
+  'Střešovice','Řepy','Zbraslav',
+]
+
+export const PROPERTY_TYPE_LABELS: Record<PropertyType, string> = {
+  'pokoj':    '🛏 Pokoj',
+  '1+kk':    '1+kk',
+  '1+1':     '1+1',
+  '2+kk':    '2+kk',
+  '2+1':     '2+1',
+  '3+kk':    '3+kk',
+  '3+1':     '3+1',
+  '4+kk':    '4+kk',
+  '4+1':     '4+1',
+  'atypical':'Atypický',
 }
 
 export type Database = {
@@ -103,7 +130,7 @@ export type Database = {
     }
     Functions: {
       search_listings_with_transit: {
-        Args: { p_line: string; p_max_price?: number; p_property_type?: string | null; p_bbox?: object | null }
+        Args: { p_line: string; p_max_price?: number; p_property_types?: string[] | null; p_districts?: string[] | null; p_bbox?: object | null }
         Returns: ListingSearchResult[]
       }
     }
