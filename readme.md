@@ -42,3 +42,4 @@ PRs welcome. Open an issue first for bigger features.
 ## License
 
 MIT
+
