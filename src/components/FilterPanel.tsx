@@ -146,10 +146,10 @@ export function FilterPanel({ filters, onChange, resultCount, loading }: Props) 
           </Section>
 
           <Section label="Vybavení">
-            <Chip active={filters.furnished} onClick={() => set({ furnished: !filters.furnished })}>🛋 Zařízený</Chip>
-            <Chip active={filters.petsAllowed} onClick={() => set({ petsAllowed: !filters.petsAllowed })}>🐾 Zvířata</Chip>
-            <Chip active={filters.parking} onClick={() => set({ parking: !filters.parking })}>🅿 Parking</Chip>
-            <Chip active={filters.balcony} onClick={() => set({ balcony: !filters.balcony })}>🌿 Balkon</Chip>
+            <Chip active={filters.furnished} onClick={() => set({ furnished: !filters.furnished })}>Zařízený</Chip>
+            <Chip active={filters.petsAllowed} onClick={() => set({ petsAllowed: !filters.petsAllowed })}>Zvířata</Chip>
+            <Chip active={filters.parking} onClick={() => set({ parking: !filters.parking })}>Parking</Chip>
+            <Chip active={filters.balcony} onClick={() => set({ balcony: !filters.balcony })}>Balkon</Chip>
           </Section>
 
           {activeCount > 0 && (

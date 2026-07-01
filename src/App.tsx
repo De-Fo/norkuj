@@ -8,7 +8,7 @@ import { Wordmark } from './components/Wordmark'
 import type { SearchFilters } from './lib/types'
 import { DEFAULT_FILTERS } from './lib/types'
 
-type Route = 'search' | 'auth' | 'create'
+type Route = 'search' | 'auth'
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null)
@@ -16,9 +16,10 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true)
   const [filters, setFilters] = useState<SearchFilters>(DEFAULT_FILTERS)
   const [showMap, setShowMap] = useState(true)
+  // Modal is separate from route — persists even when browsing
+  const [showCreate, setShowCreate] = useState(false)
 
   useEffect(() => {
-    // On mobile default to list view
     if (window.innerWidth < 768) setShowMap(false)
   }, [])
 
@@ -36,11 +37,8 @@ export default function App() {
 
   if (authLoading) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{
-        width: 22, height: 22, borderRadius: '50%',
-        border: '2px solid #2563eb', borderTopColor: 'transparent',
-        animation: 'spin 0.7s linear infinite',
-      }} />
+      <div style={{ width: 22, height: 22, borderRadius: '50%', border: '2px solid #2563eb', borderTopColor: 'transparent', animation: 'spin 0.7s linear infinite' }} />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 
@@ -51,10 +49,9 @@ export default function App() {
 
       {/* Topbar */}
       <header style={{
-        height: 48, flexShrink: 0,
-        background: 'var(--c-surface)', borderBottom: '1px solid var(--c-border)',
-        display: 'flex', alignItems: 'center', padding: '0 16px',
-        justifyContent: 'space-between',
+        height: 48, flexShrink: 0, background: 'var(--c-surface)',
+        borderBottom: '1px solid var(--c-border)',
+        display: 'flex', alignItems: 'center', padding: '0 16px', justifyContent: 'space-between',
       }}>
         <button onClick={() => setRoute('search')}
           style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
@@ -64,7 +61,7 @@ export default function App() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {user ? (
             <>
-              <button onClick={() => setRoute('create')} style={{
+              <button onClick={() => setShowCreate(true)} style={{
                 padding: '6px 14px', background: 'var(--c-text)', color: 'white',
                 border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 500, cursor: 'pointer',
               }}>
@@ -82,37 +79,44 @@ export default function App() {
               <button onClick={() => setRoute('auth')} style={{
                 padding: '6px 11px', background: 'transparent', color: 'var(--c-muted)',
                 border: '1px solid var(--c-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer',
-              }}>
-                Přihlásit
-              </button>
+              }}>Přihlásit</button>
               <button onClick={() => setRoute('auth')} style={{
                 padding: '6px 14px', background: 'var(--c-text)', color: 'white',
                 border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 500, cursor: 'pointer',
-              }}>
-                Registrovat
-              </button>
+              }}>Registrovat</button>
             </>
           )}
         </div>
       </header>
 
-      {/* Main */}
+      {/* Main — always mounted so map/state doesn't reset */}
       <main style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
-        {route === 'search' && (
-          <SearchPage
-            filters={filters}
-            onChange={setFilters}
-            showMap={showMap}
-            onToggleMap={() => setShowMap(v => !v)}
-          />
-        )}
-        {route === 'create' && (
-          <CreateListingPage onDone={() => setRoute('search')} />
-        )}
+        <SearchPage
+          filters={filters}
+          onChange={setFilters}
+          showMap={showMap}
+          onToggleMap={() => setShowMap(v => !v)}
+        />
       </main>
+
+      {/* Create listing modal — rendered as overlay, stays mounted */}
+      {showCreate && (
+        <CreateListingPage onDone={() => setShowCreate(false)} />
+      )}
 
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
+        :root {
+          --c-bg: #f4f6f8;
+          --c-surface: #ffffff;
+          --c-border: #e2e8f0;
+          --c-border-md: #cbd5e1;
+          --c-text: #0f172a;
+          --c-muted: #64748b;
+          --c-faint: #94a3b8;
+          --c-accent: #2563eb;
+          --c-rk: #e2001a;
+        }
       `}</style>
     </div>
   )

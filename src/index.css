@@ -47,3 +47,21 @@ body {
 .maplibregl-map { font-family: inherit; }
 .maplibregl-ctrl-group { border: 0.5px solid var(--c-border) !important; box-shadow: var(--shadow-card) !important; border-radius: 8px !important; }
 .maplibregl-ctrl button { border-radius: 7px !important; }
+
+ 
+* { box-sizing: border-box; margin: 0; padding: 0; }
+ 
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: var(--c-bg, #f4f6f8);
+  color: var(--c-text, #0f172a);
+  -webkit-font-smoothing: antialiased;
+}
+ 
+.maplibregl-map { font-family: inherit; }
+.maplibregl-ctrl-group {
+  border: 0.5px solid var(--c-border) !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.07) !important;
+  border-radius: 8px !important;
+}
+ 
