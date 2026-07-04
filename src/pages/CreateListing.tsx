@@ -315,7 +315,7 @@ export function CreateListingPage({ onDone }: Props) {
                       onChange={e => set({ description: e.target.value })}
                     />
                     <div style={{ fontSize: 11, color: form.description.length < 20 ? '#dc2626' : 'var(--c-faint)', marginTop: 3, textAlign: 'right' }}>
-                      {form.description.length}/5000 {form.description.length < 20 && `(min. 20)`}
+                      {form.description.trim().length}/5000 {form.description.trim().length < 20 && `(min. 20)`}
                     </div>
                   </Field>
 
@@ -395,7 +395,7 @@ export function CreateListingPage({ onDone }: Props) {
 
                   <Field label="Přesná poloha na mapě *" error={err('location')}>
                     <div style={{ fontSize: 12, color: 'var(--c-muted)', marginBottom: 6 }}>
-                      Klikni na mapu pro umístění špendlíku. Přesná adresa nebude zobrazena veřejně — jen čtvrť.
+                      Klikni na mapu pro umístění špendlíku. Adresa bude zobrazena v inzerátu. Špendlík ukazuje přibližnou polohu..
                     </div>
                     <div ref={initMap} style={{ height: 280, borderRadius: 10, overflow: 'hidden', border: `1px solid ${err('location') ? '#dc2626' : 'var(--c-border)'}` }} />
                     {form.lat

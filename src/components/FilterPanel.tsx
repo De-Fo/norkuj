@@ -119,6 +119,9 @@ export function FilterPanel({ filters, onChange, resultCount, loading }: Props) 
               </Chip>
             ))}
           </Section>
+          <p style={{ fontSize: 10, color: 'var(--c-faint)', marginTop: 4 }}>
+  Zobrazuje inzeráty označené touto čtvrtí majitelem
+</p>
 
           <Section label="Dispozice" hint="lze vybrat víc">
             {TYPE_ORDER.map(t => (

@@ -30,13 +30,16 @@ export function validateStep(step: number, form: FormData): ValidationError[] {
   const errors: ValidationError[] = []
 
   if (step === 0) {
-    if (form.title.trim().length < 5)
+    const title = form.title.trim()
+    const desc = form.description.trim()
+
+    if (title.length < 5)
       errors.push({ field: 'title', message: 'Název musí mít alespoň 5 znaků' })
-    if (form.title.trim().length > 120)
+    if (title.length > 120)
       errors.push({ field: 'title', message: 'Název může mít nejvýše 120 znaků' })
-    if (form.description.trim().length < 20)
-      errors.push({ field: 'description', message: 'Popis musí mít alespoň 20 znaků' })
-    if (form.description.trim().length > 5000)
+    if (desc.length < 20)
+      errors.push({ field: 'description', message: `Popis musí mít alespoň 20 znaků (teď: ${desc.length})` })
+    if (desc.length > 5000)
       errors.push({ field: 'description', message: 'Popis může mít nejvýše 5000 znaků' })
     if (!form.property_type)
       errors.push({ field: 'property_type', message: 'Vyber typ nemovitosti' })
@@ -62,46 +65,35 @@ export function validateStep(step: number, form: FormData): ValidationError[] {
       errors.push({ field: 'location', message: 'Klikni na mapu pro označení přesné polohy' })
   }
 
-  // Step 3 (photos) and step 4 (review) — no required validation
   return errors
 }
 
 export function mapServerError(error: { message?: string; code?: string } | null): string {
   if (!error) return 'Neznámá chyba'
   const msg = error.message ?? ''
-  const code = error.code ?? ''
 
-  // Storage errors
   if (msg.includes('Bucket not found'))
     return 'Úložiště fotografií není dostupné. Kontaktuj správce.'
   if (msg.includes('row-level security') && msg.includes('storage'))
     return 'Nemáš oprávnění nahrávat fotografie. Zkus se odhlásit a znovu přihlásit.'
-  if (msg.includes('exceeded') || msg.includes('too large'))
-    return 'Fotka je příliš velká. Maximální velikost je 5 MB.'
-  if (msg.includes('mime') || msg.includes('type'))
-    return 'Nepodporovaný formát fotky. Použij JPG, PNG nebo WebP.'
-
-  // DB constraint errors
+  if (msg.includes('foreign key') && msg.includes('owner_id'))
+    return 'Tvůj profil nebyl nalezen. Odhlás se a přihlas znovu — profil se vytvoří automaticky.'
   if (msg.includes('listings_description_check'))
-    return 'Popis je příliš krátký nebo dlouhý (20–5000 znaků).'
+    return 'Popis je příliš krátký (min. 20 znaků) nebo dlouhý (max. 5000 znaků).'
   if (msg.includes('listings_title_check'))
-    return 'Název je příliš krátký nebo dlouhý (5–120 znaků).'
+    return 'Název je příliš krátký (min. 5 znaků) nebo dlouhý (max. 120 znaků).'
   if (msg.includes('listings_price_czk_check'))
-    return 'Zadej platnou výši nájemného.'
+    return 'Zadej platnou výši nájemného (min. 1 Kč).'
   if (msg.includes('listings_area_sqm_check'))
     return 'Plocha musí být mezi 5 a 1000 m².'
   if (msg.includes('row-level security'))
     return 'Nejsi přihlášen nebo nemáš oprávnění. Zkus se znovu přihlásit.'
-  if (msg.includes('violates foreign key'))
-    return 'Tvůj účet nebyl nalezen. Zkus se odhlásit a znovu přihlásit.'
-  if (msg.includes('duplicate') || code === '23505')
+  if (msg.includes('duplicate') || (error.code ?? '') === '23505')
     return 'Tento inzerát již existuje.'
   if (msg.includes('network') || msg.includes('fetch'))
     return 'Chyba připojení. Zkontroluj internet a zkus znovu.'
-
-  // Auth errors
   if (msg.includes('JWT') || msg.includes('token'))
     return 'Přihlášení vypršelo. Přihlas se znovu.'
 
-  return 'Něco se pokazilo. Zkus to prosím znovu.'
+  return `Něco se pokazilo: ${msg}`
 }

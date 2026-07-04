@@ -4,9 +4,13 @@ import { supabase } from './lib/supabase'
 import { SearchPage } from './pages/Search'
 import { AuthPage } from './pages/Auth'
 import { CreateListingPage } from './pages/CreateListing'
+import { ListingDetail } from './pages/ListingDetail'
+import { AdminPanel } from './pages/AdminPanel'
 import { Wordmark } from './components/Wordmark'
 import type { SearchFilters } from './lib/types'
 import { DEFAULT_FILTERS } from './lib/types'
+
+const ADMIN_UIDS = ['']
 
 type Route = 'search' | 'auth'
 
@@ -16,8 +20,9 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true)
   const [filters, setFilters] = useState<SearchFilters>(DEFAULT_FILTERS)
   const [showMap, setShowMap] = useState(true)
-  // Modal is separate from route — persists even when browsing
   const [showCreate, setShowCreate] = useState(false)
+  const [showAdmin, setShowAdmin] = useState(false)
+  const [selectedListingId, setSelectedListingId] = useState<string | null>(null)
 
   useEffect(() => {
     if (window.innerWidth < 768) setShowMap(false)
@@ -44,10 +49,11 @@ export default function App() {
 
   if (route === 'auth') return <AuthPage />
 
+  const isAdmin = user ? ADMIN_UIDS.includes(user.id) : false
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden' }}>
 
-      {/* Topbar */}
       <header style={{
         height: 48, flexShrink: 0, background: 'var(--c-surface)',
         borderBottom: '1px solid var(--c-border)',
@@ -59,6 +65,14 @@ export default function App() {
         </button>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {isAdmin && (
+            <button onClick={() => setShowAdmin(true)} style={{
+              padding: '5px 11px', background: '#7c3aed', color: 'white',
+              border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 500, cursor: 'pointer',
+            }}>
+              🛠 Admin
+            </button>
+          )}
           {user ? (
             <>
               <button onClick={() => setShowCreate(true)} style={{
@@ -89,19 +103,29 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main — always mounted so map/state doesn't reset */}
       <main style={{ flex: 1, overflow: 'hidden', display: 'flex' }}>
         <SearchPage
           filters={filters}
           onChange={setFilters}
           showMap={showMap}
           onToggleMap={() => setShowMap(v => !v)}
+          onListingClick={(id) => setSelectedListingId(id)}
         />
       </main>
 
-      {/* Create listing modal — rendered as overlay, stays mounted */}
       {showCreate && (
         <CreateListingPage onDone={() => setShowCreate(false)} />
+      )}
+
+      {selectedListingId && (
+        <ListingDetail
+          listingId={selectedListingId}
+          onClose={() => setSelectedListingId(null)}
+        />
+      )}
+
+      {showAdmin && (
+        <AdminPanel onClose={() => setShowAdmin(false)} />
       )}
 
       <style>{`
