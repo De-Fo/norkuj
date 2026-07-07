@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import { PROPERTY_TYPE_LABELS } from '../lib/types'
 import { formatPrice, formatDate, getImageUrl } from '../lib/utils'
 
-const ADMIN_UIDS = ['']
+const ADMIN_UIDS = import.meta.env.PANEL_ADMIN_UIDS;
 
 interface AdminListing {
   id: string

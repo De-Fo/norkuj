@@ -13,10 +13,9 @@ interface Props {
   onChange: (f: SearchFilters) => void
   showMap: boolean
   onToggleMap: () => void
-  onListingClick: (id: string) => void  // ← pridaj
 }
 
-export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingClick }: Props) {
+export function SearchPage({ filters, onChange, showMap, onToggleMap }: Props) {
   const [listings, setListings] = useState<ListingSearchResult[]>([])
   const [loading, setLoading] = useState(false)
   const [highlightedId, setHighlightedId] = useState<string | null>(null)
@@ -175,7 +174,7 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
               {inArea.map(l => (
                 <div key={l.listing_id} data-id={l.listing_id}>
                   <ListingCard listing={l} highlighted={highlightedId === l.listing_id}
-                    onClick={() => onListingClick(l.listing_id)} />
+                    onClick={() => setHighlightedId(l.listing_id === highlightedId ? null : l.listing_id)} />
                 </div>
               ))}
               {outArea.length > 0 && (
@@ -190,7 +189,7 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
                   {outArea.map(l => (
                     <div key={l.listing_id} data-id={l.listing_id}>
                       <ListingCard listing={l} highlighted={highlightedId === l.listing_id}
-                        onClick={() => onListingClick(l.listing_id)}/>
+                        onClick={() => setHighlightedId(l.listing_id === highlightedId ? null : l.listing_id)} />
                     </div>
                   ))}
                 </>

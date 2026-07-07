@@ -10,7 +10,8 @@ import { Wordmark } from './components/Wordmark'
 import type { SearchFilters } from './lib/types'
 import { DEFAULT_FILTERS } from './lib/types'
 
-const ADMIN_UIDS = ['']
+const ADMIN_UIDS = import.meta.env.VITE_PANEL_ADMIN_UIDS;
+
 
 type Route = 'search' | 'auth'
 
