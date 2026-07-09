@@ -89,6 +89,8 @@ export interface SearchFilters {
   parking: boolean                // toggle
   balcony: boolean                // toggle
   filterByMapArea: boolean        // toggle — filter by visible map bounds
+  sortBy: 'date' | 'price' | 'area'  // sort field
+  sortDir: 'asc' | 'desc'            // sort direction
 }
 
 export const DEFAULT_FILTERS: SearchFilters = {
@@ -103,6 +105,8 @@ export const DEFAULT_FILTERS: SearchFilters = {
   parking: false,
   balcony: false,
   filterByMapArea: false,
+  sortBy: 'date',
+  sortDir: 'desc',
 }
 
 export const PRAGUE_DISTRICTS = [

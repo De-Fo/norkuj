@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import type { ListingSearchResult, SearchFilters, TransitStatus } from '../lib/types'
 import { ListingCard } from '../components/ListingCard'
@@ -31,6 +31,7 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
   const [isoMinutes, setIsoMinutes] = useState(10)
   const [isoPolygon, setIsoPolygon] = useState<[number, number][] | null>(null)
   const [isoLoading, setIsoLoading] = useState(false)
+  const [isoModeActive, setIsoModeActive] = useState(false)  // toggle for isochrone map-click mode
   const listRef = useRef<HTMLDivElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isoFetchRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -92,25 +93,33 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
 
     // ═══════════════════════════════════════════════════════════════
     // 3. Merge transit info + compute smart color
+    // When BOTH transitLines AND districts are selected:
+    //   green  = v obou oblastech  → listing je v okrsku A ZÁROVEŇ blízko linky
+    //   yellow = jenom v městské části  → listing je v okrsku, ale daleko od linky
+    //   red    = jenom na trase linek  → listing je blízko linky, ale mimo okrsek
+    //   grey   = ostatní
+    // When only transit is selected: green=near, yellow=walkable, grey=far
+    // When only district is selected: yellow=in district, grey=out
     // ═══════════════════════════════════════════════════════════════
     const merged = base.map((l: any): ListingSearchResult => {
       const info = transitInfo.get(l.id)
-      const near = info?.nearTransit ?? false
       const inDist = inExpandedDistrict(l)
       const hasDist = expandedDistricts.length > 0
+      const metres = info?.metres ?? 0
+
+      const hasMetres = metres > 0
+      const near = hasMetres && metres <= 500
+      const walkable = hasMetres && metres <= 1500
 
       let status: TransitStatus
       if (hasTransit && hasDist) {
-        // Both filters active → 4-color system
-        if (inDist && near)       status = 'green'
-        else if (inDist && !near) status = 'yellow'
-        else if (!inDist && near) status = 'red'
-        else                      status = 'grey'
+        if (inDist && near)           status = 'green'   // v obou oblastech
+        else if (inDist)              status = 'yellow'  // jenom v městské části
+        else if (near)                status = 'red'     // jenom na trase vyznačené linky
+        else                          status = 'grey'    // ostatní
       } else if (hasTransit) {
-        // Only transit filter active
-        status = near ? 'green' : 'grey'
+        status = near   ? 'green' : walkable ? 'yellow' : 'grey'
       } else if (hasDist) {
-        // Only district filter active
         status = inDist ? 'yellow' : 'grey'
       } else {
         status = 'grey'
@@ -127,12 +136,15 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
     })
 
     // ═══════════════════════════════════════════════════════════════
-    // 4. Hard filters (price, area, type, amenities, bbox)
+    // 4. Hard filters (price, area, type, amenities, bbox, transit+district)
     // ═══════════════════════════════════════════════════════════════
     let filtered = [...merged]
 
-    // District is a hard filter ONLY when transit is NOT active
-    if (!hasTransit && expandedDistricts.length > 0) {
+    // District hard filter — when transit+area both active, grey listings
+    // (matching neither filter) are excluded entirely
+    if (hasTransit && expandedDistricts.length > 0) {
+      filtered = filtered.filter(l => l.transit_status !== 'grey')
+    } else if (!hasTransit && expandedDistricts.length > 0) {
       filtered = filtered.filter(l => inExpandedDistrict(l))
     }
 
@@ -160,12 +172,30 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // 5. Sort — green → yellow → red → grey
+    // 5. Sort
     // ═══════════════════════════════════════════════════════════════
+    const sortField = f.sortBy ?? 'date'
+    const sortDir = f.sortDir ?? 'desc'
+    const dir = sortDir === 'desc' ? -1 : 1
+
+    // When transit is active, primary sort is by status (green→yellow→red→grey)
     if (hasTransit) {
-      filtered.sort((a, b) => STATUS_RANK[a.transit_status] - STATUS_RANK[b.transit_status] || a.price_total_czk - b.price_total_czk)
+      filtered.sort((a, b) => {
+        const statusDiff = STATUS_RANK[a.transit_status] - STATUS_RANK[b.transit_status]
+        if (statusDiff !== 0) return statusDiff
+        // Secondary sort
+        if (sortField === 'price') return (a.price_total_czk - b.price_total_czk) * dir
+        if (sortField === 'area') return (a.area_sqm - b.area_sqm) * dir
+        // date — use created_at from raw data, fallback to listing order
+        return ((a as any).created_at ?? '').localeCompare((b as any).created_at ?? '') * dir
+      })
     } else {
-      filtered.sort((a, b) => a.price_total_czk - b.price_total_czk)
+      filtered.sort((a, b) => {
+        if (sortField === 'price') return (a.price_total_czk - b.price_total_czk) * dir
+        if (sortField === 'area') return (a.area_sqm - b.area_sqm) * dir
+        // date — newest first by default
+        return ((a as any).created_at ?? '').localeCompare((b as any).created_at ?? '') * dir
+      })
     }
 
     setListings(filtered)
@@ -183,31 +213,36 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
   }, [filters, bbox, fetchListings])
 
   const handleMarkerClick = useCallback((id: string) => {
-    setHighlightedId(id)
-    listRef.current?.querySelector(`[data-id="${id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-  }, [])
+    onListingClick(id)
+  }, [onListingClick])
 
   // ── Isochrone: fetch from Supabase RPC and compute polygon ──
   const fetchIsochrone = useCallback(async (lat: number, lng: number, minutes: number) => {
     setIsoLoading(true)
     try {
+      console.log('[Isochrone] fetching for', lat, lng, minutes + 'min')
       const { data, error } = await (supabase.rpc as any)('calculate_isochrone', {
         p_lat: lat,
         p_lng: lng,
         p_minutes: minutes,
       })
+      console.log('[Isochrone] got', data?.length ?? 0, 'stops, error:', error)
       if (error || !data || data.length === 0) {
-        console.error('[Isochrone] error:', error)
+        console.error('[Isochrone] no stops returned:', error)
         setIsoPolygon(null)
         return
       }
       // Build convex hull from stop coordinates [lng, lat]
       const points: [number, number][] = (data as any[])
-        .filter((s: any) => s.lat && s.lon)
-        .map((s: any) => [s.lon, s.lat])
+        .filter((s: any) => s.stop_lat && s.stop_lon)
+        .map((s: any) => [s.stop_lon, s.stop_lat])
       if (points.length >= 3) {
-        setIsoPolygon(expandHull(convexHull(points), 0.003))
+        const hull = convexHull(points)
+        const expanded = expandHull(hull, 0.003)
+        console.log('[Isochrone] polygon created:', hull.length, 'hull pts ->', expanded.length, 'expanded pts')
+        setIsoPolygon(expanded)
       } else {
+        console.warn('[Isochrone] only', points.length, 'points, need >= 3')
         setIsoPolygon(null)
       }
     } catch (err) {
@@ -223,11 +258,13 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
     isoFetchRef.current = setTimeout(() => fetchIsochrone(lat, lng, minutes), 400)
   }, [fetchIsochrone])
 
-  // Handle map click for isochrone
+  // Handle map click for isochrone — only when isoModeActive is on
   const handleIsochroneMapClick = useCallback((lat: number, lng: number) => {
+    if (!isoModeActive) return
+    setIsoModeActive(false)  // deactivate after one click so markers work again
     setIsoCenter({ lat, lng })
     scheduleIsochrone(lat, lng, isoMinutes)
-  }, [isoMinutes, scheduleIsochrone])
+  }, [isoModeActive, isoMinutes, scheduleIsochrone])
   // ── Apply isochrone polygon filter if active ──
   const listingsFilteredByIso = isoPolygon && isoPolygon.length >= 3
     ? listings.filter(l => l.lat && l.lng && pointInConvexPolygon([l.lng, l.lat], isoPolygon))
@@ -237,15 +274,12 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
   const hasDistFilter = filters.districts.length > 0
   const hasColoring = hasTransitFilter || hasDistFilter
 
-  // For rendering: split into "in" (green/yellow) and "out" (red/grey)
-  // When only transit filter is active: green = near, grey = far
-  // When only district filter is active: yellow = in district, grey = out
-  // When both active: green = both, yellow = district only, red = transit only, grey = neither
+  // For rendering: split into "in" (green/yellow/red) and "out" (grey)
   const inArea = hasColoring
-    ? listingsFilteredByIso.filter(l => l.transit_status === 'green' || l.transit_status === 'yellow')
+    ? listingsFilteredByIso.filter(l => l.transit_status !== 'grey')
     : listingsFilteredByIso
   const outArea = hasColoring
-    ? listingsFilteredByIso.filter(l => l.transit_status === 'red' || l.transit_status === 'grey')
+    ? listingsFilteredByIso.filter(l => l.transit_status === 'grey')
     : []
 
   return (
@@ -307,20 +341,60 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
                 style={{
                   padding: '2px 7px', border: '1px solid var(--c-border)', borderRadius: 4,
                   background: 'transparent', fontSize: 10, color: 'var(--c-muted)', cursor: 'pointer',
-                  marginLeft: 'auto',
                 }}>
                 ✕ Zrušit
               </button>
             </>
           ) : (
-            <span style={{ fontSize: 11, color: 'var(--c-faint)' }}>
-              🖱 Klikni na mapu pro výpočet dojezdové vzdálenosti
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <button onClick={() => setIsoModeActive(v => !v)}
+                style={{
+                  padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
+                  border: isoModeActive ? 'none' : '1px solid var(--c-border)',
+                  background: isoModeActive ? '#2563eb' : 'transparent',
+                  color: isoModeActive ? '#fff' : 'var(--c-muted)',
+                  fontSize: 11, fontWeight: isoModeActive ? 600 : 400,
+                  whiteSpace: 'nowrap',
+                }}>
+                📍 Dojezd PID (MHD)
+              </button>
+              {!isoModeActive &&
+                <span style={{ fontSize: 10, color: '#000', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+                  reálný dosah z libovolného místa pomocí dopravy PID
+                </span>
+              }
+              {isoModeActive &&
+                <span style={{ fontSize: 10, color: '#2563eb', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                  klikni na mapu pro výpočet
+                </span>
+              }
+            </div>
           )}
+
+          {/* Sort controls */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: isoCenter ? 0 : 'auto' }}>
+            <select value={filters.sortBy} onChange={e => onChange({ ...filters, sortBy: e.target.value as any })}
+              style={{
+                padding: '2px 6px', border: '1px solid var(--c-border)', borderRadius: 4,
+                fontSize: 10, color: 'var(--c-muted)', background: 'white', outline: 'none',
+              }}>
+              <option value="date">Datum</option>
+              <option value="price">Cena</option>
+              <option value="area">Plocha</option>
+            </select>
+            <button onClick={() => onChange({ ...filters, sortDir: filters.sortDir === 'desc' ? 'asc' : 'desc' })}
+              style={{
+                padding: '2px 6px', border: '1px solid var(--c-border)', borderRadius: 4,
+                background: 'transparent', fontSize: 11, color: 'var(--c-muted)', cursor: 'pointer',
+                lineHeight: 1.2,
+              }}>
+              {filters.sortDir === 'desc' ? '↓' : '↑'}
+            </button>
+          </div>
+
           <button onClick={onToggleMap} style={{
             padding: '4px 10px', border: '1px solid var(--c-border)', borderRadius: 6,
             background: 'transparent', fontSize: 11, color: 'var(--c-muted)', cursor: 'pointer',
-            marginLeft: isoCenter ? 0 : 'auto',
           }}>
             {showMap ? '🗺 Skrýt mapu' : '🗺 Zobrazit mapu'}
           </button>
@@ -343,16 +417,60 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
             </div>
           )}
 
-          {!loading && (
+          {!loading && !hasColoring && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-              {inArea.map(l => (
+              {listingsFilteredByIso.map(l => (
                 <div key={l.listing_id} data-id={l.listing_id}>
                   <ListingCard listing={l} highlighted={highlightedId === l.listing_id}
                     onClick={() => onListingClick(l.listing_id)} />
                 </div>
               ))}
-              {/* Divider only renders when coloring filters are active AND there are out-of-area results */}
-              {hasColoring && outArea.length > 0 && (
+            </div>
+          )}
+
+          {!loading && hasColoring && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              {/* Section labels depend on which filters are active */}
+              {(() => {
+                const hasBoth = hasTransitFilter && hasDistFilter
+                const hasTransitOnly = hasTransitFilter && !hasDistFilter
+                const hasDistOnly = !hasTransitFilter && hasDistFilter
+
+                const sections: { key: TransitStatus; color: string; label: string }[] = []
+                if (hasBoth) {
+                  sections.push({ key: 'green', color: '#16a34a', label: '● V obou oblastech' })
+                  sections.push({ key: 'yellow', color: '#ca8a04', label: '● Jen v městské části' })
+                  sections.push({ key: 'red', color: '#dc2626', label: '● Jen na trase linek' })
+                } else if (hasTransitOnly) {
+                  sections.push({ key: 'green', color: '#16a34a', label: '● V dosahu linky' })
+                  sections.push({ key: 'yellow', color: '#ca8a04', label: '● Dále od linky' })
+                } else if (hasDistOnly) {
+                  sections.push({ key: 'yellow', color: '#ca8a04', label: '● V městské části' })
+                }
+
+                return sections.map(s => (
+                  <React.Fragment key={s.key}>
+                    {inArea.some(l => l.transit_status === s.key) && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0' }}>
+                        <div style={{ flex: 1, height: 1, background: 'var(--c-border-md)' }} />
+                        <span style={{ fontSize: 10, color: s.color, whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
+                          {s.label}
+                        </span>
+                        <div style={{ flex: 1, height: 1, background: 'var(--c-border-md)' }} />
+                      </div>
+                    )}
+                    {inArea.filter(l => l.transit_status === s.key).map(l => (
+                      <div key={l.listing_id} data-id={l.listing_id}>
+                        <ListingCard listing={l} highlighted={highlightedId === l.listing_id}
+                          onClick={() => onListingClick(l.listing_id)} />
+                      </div>
+                    ))}
+                  </React.Fragment>
+                ))
+              })()}
+
+              {/* ── Ostatní (grey) — only when transit-only or district-only ── */}
+              {outArea.length > 0 && (
                 <>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0' }}>
                     <div style={{ flex: 1, height: 1, background: 'var(--c-border-md)' }} />

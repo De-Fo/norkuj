@@ -233,14 +233,23 @@ export function ListingDetail({ listingId, onClose, onRequestAuth }: Props) {
                   <p style={{ fontSize: 14, lineHeight: 1.7, whiteSpace: 'pre-wrap', color: '#0f172a', margin: 0 }}>{listing.description}</p>
                 </div>
 
-                {/* Mini map — extract from PostGIS GeoJSON or WKT */}
+                {/* Mini map — extract from PostGIS WKB hex, GeoJSON, or WKT */}
                 {(() => {
                   const loc = (listing as any).location
                   let _lat: number | null = null
                   let _lng: number | null = null
                   if (loc) {
+                    // WKB hex: "0101000020E6100000<8bytesX><8bytesY>"
+                    if (typeof loc === 'string' && /^01010000[02]0E6100/i.test(loc) && loc.length >= 50) {
+                      const hexX = loc.slice(18, 34), hexY = loc.slice(34, 50)
+                      const bytes = new Uint8Array(
+                        (hexX + hexY).match(/.{2}/g)!.map(b => parseInt(b, 16))
+                      )
+                      _lng = new DataView(bytes.buffer).getFloat64(0, true)
+                      _lat = new DataView(bytes.buffer).getFloat64(8, true)
+                    }
                     // GeoJSON: {type:"Point",coordinates:[lng,lat]}
-                    if (loc.coordinates && Array.isArray(loc.coordinates)) {
+                    if (_lat == null && loc.coordinates && Array.isArray(loc.coordinates)) {
                       _lng = loc.coordinates[0]; _lat = loc.coordinates[1]
                     }
                     // WKT string fallback: "POINT(lng lat)"

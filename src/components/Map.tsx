@@ -64,6 +64,8 @@ export function Map({ listings, highlightedId, onMarkerClick, onBoundsChange, ac
   const mapRef = useRef<maplibregl.Map | null>(null)
   const markersRef = useRef<globalThis.Map<string, maplibregl.Marker>>(new globalThis.Map())
   const activeLayerIds = useRef<string[]>([])
+  const onIsochroneClickRef = useRef(onIsochroneClick)
+  onIsochroneClickRef.current = onIsochroneClick
 
   const removeOverlays = useCallback((map: maplibregl.Map) => {
     activeLayerIds.current.forEach(id => {
@@ -139,10 +141,12 @@ export function Map({ listings, highlightedId, onMarkerClick, onBoundsChange, ac
     const renderIso = () => {
       const isoId = 'isochrone-fill'
       const isoLineId = 'isochrone-line'
-      if (map.getLayer(isoId)) map.removeLayer(isoId)
-      if (map.getLayer(isoLineId)) map.removeLayer(isoLineId)
-      if (map.getSource('isochrone')) map.removeSource('isochrone')
+      try {
+        if (map.getLayer(isoId)) { map.removeLayer(isoId); map.removeLayer(isoLineId) }
+        if (map.getSource('isochrone')) map.removeSource('isochrone')
+      } catch (e) { /* ignore if layers don't exist yet */ }
       if (isochronePolygon && isochronePolygon.length >= 3) {
+        console.log('[IsochroneMap] rendering polygon with', isochronePolygon.length, 'verts')
         map.addSource('isochrone', {
           type: 'geojson',
           data: {
@@ -153,19 +157,26 @@ export function Map({ listings, highlightedId, onMarkerClick, onBoundsChange, ac
         })
         map.addLayer({
           id: isoId, type: 'fill', source: 'isochrone',
-          paint: { 'fill-color': '#2563eb', 'fill-opacity': 0.08 }
+          paint: { 'fill-color': '#2563eb', 'fill-opacity': 0.15 }
         })
         map.addLayer({
           id: isoLineId, type: 'line', source: 'isochrone',
-          paint: { 'line-color': '#2563eb', 'line-width': 2.5, 'line-opacity': 0.6, 'line-dasharray': [4, 3] }
+          paint: { 'line-color': '#2563eb', 'line-width': 3, 'line-opacity': 0.8, 'line-dasharray': [4, 3] }
         })
+      } else {
+        console.log('[IsochroneMap] no polygon to render')
       }
     }
     if (!map.isStyleLoaded()) {
       map.once('style.load', renderIso)
-      return
+      console.log('[IsochroneMap] waiting for style.load')
+      // Fallback: try again after a short delay
+      setTimeout(() => {
+        if (map.isStyleLoaded()) renderIso()
+      }, 500)
+    } else {
+      renderIso()
     }
-    renderIso()
   }, [isochronePolygon])
 
   useEffect(() => {
@@ -181,10 +192,9 @@ export function Map({ listings, highlightedId, onMarkerClick, onBoundsChange, ac
       onBoundsChange({ west: b.getWest(), south: b.getSouth(), east: b.getEast(), north: b.getNorth() })
     })
     map.on('click', (e) => {
-      // Check if click hit a marker — if so, let marker click handle it
-      const features = map.queryRenderedFeatures(e.point)
-      if (onIsochroneClick && !features.some(f => f.source === 'listings')) {
-        onIsochroneClick(e.lngLat.lat, e.lngLat.lng)
+      // Use the latest onIsochroneClick from a ref — avoids stale closures
+      if (onIsochroneClickRef.current) {
+        onIsochroneClickRef.current(e.lngLat.lat, e.lngLat.lng)
       }
     })
     map.on('load', () => addOverlays(map, activeLines, activeDistricts))
@@ -241,7 +251,7 @@ export function Map({ listings, highlightedId, onMarkerClick, onBoundsChange, ac
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
       <div style={{ position: 'absolute', bottom: 12, left: 12, background: 'white', border: '1px solid var(--c-border)', borderRadius: 9, padding: '8px 11px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', fontSize: 11, pointerEvents: 'none' }}>
-        {([['#16a34a','V oblasti + u linky'],['#ca8a04','V oblasti, mimo linku'],['#dc2626','U linky, mimo oblast'],['#9ca3af','Ostatní']] as [string,string][]).map(([color, label]) => (
+        {([['#16a34a','V obou oblastech'],['#ca8a04','Jen v městské části'],['#dc2626','Jen na trase linek'],['#9ca3af','Ostatní']] as [string,string][]).map(([color, label]) => (
           <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />
             <span style={{ color: 'var(--c-muted)' }}>{label}</span>

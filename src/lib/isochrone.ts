@@ -52,14 +52,14 @@ export function convexHull(points: [number, number][]): [number, number][] {
 
 /**
  * Expand a convex hull outward from its centroid to create a more natural
- * travel-zone appearance. Each hull vertex is pushed outward by `bufferDeg`
- * (in degrees — 0.001 ≈ ~110m at Prague latitude).
+ * travel-zone appearance. The expansion is proportional to the hull's size:
+ * 20% of the average vertex-to-centroid distance, clamped to [0.0005, 0.005].
  *
  * Then interpolates extra mid-edge points so the polygon is smooth.
  */
 export function expandHull(
   hull: [number, number][],
-  bufferDeg: number = 0.002  // ~220m buffer
+  _unused?: number  // kept for backward compat, ignored
 ): [number, number][] {
   if (hull.length < 3) return hull
 
@@ -67,6 +67,17 @@ export function expandHull(
   let cx = 0, cy = 0
   for (const [x, y] of hull) { cx += x; cy += y }
   cx /= hull.length; cy /= hull.length
+
+  // Average distance from centroid → determines proportional buffer
+  let avgDist = 0
+  for (const [x, y] of hull) {
+    avgDist += Math.sqrt((x - cx) ** 2 + (y - cy) ** 2)
+  }
+  avgDist /= hull.length
+
+  // Buffer = 20% of average distance, clamped to [0.0005, 0.005]
+  // (0.001 ≈ 110m at Prague latitude)
+  const bufferDeg = Math.max(0.0005, Math.min(0.005, avgDist * 0.2))
 
   // Expand each vertex outward from centroid
   const expanded: Point[] = hull.map(([x, y]) => {
