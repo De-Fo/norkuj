@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import { PROPERTY_TYPE_LABELS } from '../lib/types'
 import { formatPrice, formatDate, getImageUrl } from '../lib/utils'
 
-const ADMIN_UIDS = import.meta.env.PANEL_ADMIN_UIDS;
+const ADMIN_UIDS = (import.meta.env.VITE_ADMIN_UIDS ?? '').split(',').map((s: string) => s.trim()).filter(Boolean)
 
 interface AdminListing {
   id: string
@@ -118,7 +118,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
     setActing(true)
     const { error } = await supabase
       .from('listings')
-      .update({ status: 'published' })
+      .update({ status: 'published', published_at: new Date().toISOString() })
       .eq('id', id)
 
     if (error) {
@@ -137,7 +137,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
     setActing(true)
     const { error } = await supabase
       .from('listings')
-      .update({ status: 'rejected' })
+      .update({ status: 'rejected', rejection_reason: rejectReason.trim() })
       .eq('id', id)
 
     if (error) {

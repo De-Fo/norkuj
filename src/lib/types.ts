@@ -8,6 +8,7 @@ export interface Profile {
   display_name: string
   avatar_url: string | null
   phone: string
+  email: string         
   email_verified: boolean
   is_banned: boolean
   ban_reason: string | null
@@ -45,6 +46,7 @@ export interface Listing {
   updated_at: string
   published_at: string | null
   expires_at: string | null
+  location?: any                   // PostGIS geography POINT — Supabase returns {type:"Point",coordinates:[lng,lat]}
 }
 
 export interface PidStation {
@@ -79,24 +81,28 @@ export interface SearchFilters {
   transitLines: string[]          // multi: ['A', '22'] — best status wins per listing
   propertyTypes: PropertyType[]   // multi: ['2+kk', '3+kk'] — OR logic
   districts: string[]             // multi: ['Vinohrady', 'Žižkov'] — OR logic
-  maxPrice: number                // single: upper bound, 0 = no limit
+  minPrice: number                // text input: lower bound, 0 = no limit
+  maxPrice: number                // text input: upper bound, 0 = no limit
   minArea: number                 // single: lower bound, 0 = no limit
   furnished: boolean              // toggle
   petsAllowed: boolean            // toggle
   parking: boolean                // toggle
   balcony: boolean                // toggle
+  filterByMapArea: boolean        // toggle — filter by visible map bounds
 }
 
 export const DEFAULT_FILTERS: SearchFilters = {
   transitLines: [],
   propertyTypes: [],
   districts: [],
+  minPrice: 0,
   maxPrice: 0,
   minArea: 0,
   furnished: false,
   petsAllowed: false,
   parking: false,
   balcony: false,
+  filterByMapArea: false,
 }
 
 export const PRAGUE_DISTRICTS = [

@@ -20,7 +20,7 @@ export interface FormData {
   balcony: boolean
   cellar: boolean
   address_street: string
-  address_district: string
+  address_districts: string[]
   lat: number | null
   lng: number | null
   images: File[]
@@ -34,7 +34,7 @@ export function validateStep(step: number, form: FormData): ValidationError[] {
     const desc = form.description.trim()
 
     if (title.length < 5)
-      errors.push({ field: 'title', message: 'Název musí mít alespoň 5 znaků' })
+      errors.push({ field: 'title', message: `Název musí mít alespoň 5 znaků (teď: ${title.length})` })
     if (title.length > 120)
       errors.push({ field: 'title', message: 'Název může mít nejvýše 120 znaků' })
     if (desc.length < 20)
@@ -59,8 +59,8 @@ export function validateStep(step: number, form: FormData): ValidationError[] {
   if (step === 2) {
     if (form.address_street.trim().length < 3)
       errors.push({ field: 'address_street', message: 'Zadej ulici a číslo' })
-    if (!form.address_district)
-      errors.push({ field: 'address_district', message: 'Vyber část Prahy' })
+    if (form.address_districts.length === 0)
+      errors.push({ field: 'address_districts', message: 'Vyber alespoň 1 část Prahy' })
     if (!form.lat || !form.lng)
       errors.push({ field: 'location', message: 'Klikni na mapu pro označení přesné polohy' })
   }
@@ -77,13 +77,13 @@ export function mapServerError(error: { message?: string; code?: string } | null
   if (msg.includes('row-level security') && msg.includes('storage'))
     return 'Nemáš oprávnění nahrávat fotografie. Zkus se odhlásit a znovu přihlásit.'
   if (msg.includes('foreign key') && msg.includes('owner_id'))
-    return 'Tvůj profil nebyl nalezen. Odhlás se a přihlas znovu — profil se vytvoří automaticky.'
+    return 'Tvůj profil nebyl nalezen. Odhlás se a přihlas znovu.'
   if (msg.includes('listings_description_check'))
     return 'Popis je příliš krátký (min. 20 znaků) nebo dlouhý (max. 5000 znaků).'
   if (msg.includes('listings_title_check'))
     return 'Název je příliš krátký (min. 5 znaků) nebo dlouhý (max. 120 znaků).'
   if (msg.includes('listings_price_czk_check'))
-    return 'Zadej platnou výši nájemného (min. 1 Kč).'
+    return 'Zadej platnou výši nájemného.'
   if (msg.includes('listings_area_sqm_check'))
     return 'Plocha musí být mezi 5 a 1000 m².'
   if (msg.includes('row-level security'))

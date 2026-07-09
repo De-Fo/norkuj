@@ -61,7 +61,8 @@ export function FilterPanel({ filters, onChange, resultCount, loading }: Props) 
     filters.transitLines.length > 0 ? `${filters.transitLines.length} ${filters.transitLines.length === 1 ? 'linka' : 'linky'}` : null,
     filters.districts.length > 0 ? `${filters.districts.length} ${filters.districts.length === 1 ? 'oblast' : 'oblasti'}` : null,
     filters.propertyTypes.length > 0 ? filters.propertyTypes.map(t => PROPERTY_TYPE_LABELS[t]).join(', ') : null,
-    filters.maxPrice ? `do ${(filters.maxPrice / 1000).toFixed(0)}k` : null,
+    (filters.minPrice || filters.maxPrice) ? `${filters.minPrice ? `${(filters.minPrice/1000).toFixed(0)}k` : ''}–${filters.maxPrice ? `${(filters.maxPrice/1000).toFixed(0)}k` : ''}` : null,
+    filters.filterByMapArea ? '🗺 mapa' : null,
   ].filter(Boolean).join(' · ')
 
   return (
@@ -91,6 +92,26 @@ export function FilterPanel({ filters, onChange, resultCount, loading }: Props) 
 
       {expanded && (
         <div style={{ padding: '0 12px 14px', display: 'flex', flexDirection: 'column', gap: 14, maxHeight: '60vh', overflowY: 'auto' }}>
+
+          {/* Toggle switch for map-area filtering — always visible at top */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0' }}>
+            <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--c-text)' }}>
+              🗺 Filtrovat dle pohybu mapy
+            </span>
+            <div onClick={() => set({ filterByMapArea: !filters.filterByMapArea })}
+              style={{
+                width: 38, height: 22, borderRadius: 11, cursor: 'pointer',
+                background: filters.filterByMapArea ? 'var(--c-accent, #2563eb)' : 'var(--c-border-md)',
+                position: 'relative', transition: 'background 0.2s', flexShrink: 0,
+              }}>
+              <div style={{
+                width: 16, height: 16, borderRadius: '50%', background: 'white',
+                position: 'absolute', top: 3, left: filters.filterByMapArea ? 19 : 3,
+                transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+              }} />
+            </div>
+          </div>
+          <div style={{ height: 1, background: 'var(--c-border)' }} />
 
           <Section label="Metro" hint="lze vybrat víc">
             {METRO_LINES.map(line => (
@@ -129,12 +150,16 @@ export function FilterPanel({ filters, onChange, resultCount, loading }: Props) 
             ))}
           </Section>
 
-          <Section label="Max. nájem" hint="jedna hodnota">
-            {PRICE_OPTS.map(p => (
-              <Chip key={p} active={filters.maxPrice === p} onClick={() => set({ maxPrice: filters.maxPrice === p ? 0 : p })}>
-                do {(p / 1000).toFixed(0)}k
-              </Chip>
-            ))}
+          <Section label="Nájem" hint="Kč">
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <input type="number" min={0} max={999999} placeholder="od" value={filters.minPrice || ''}
+                onChange={e => set({ minPrice: parseInt(e.target.value) || 0 })}
+                style={{ width: 72, padding: '4px 7px', border: '1px solid var(--c-border)', borderRadius: 6, fontSize: 12, outline: 'none', color: 'var(--c-text)' }} />
+              <span style={{ fontSize: 11, color: 'var(--c-faint)' }}>—</span>
+              <input type="number" min={0} max={999999} placeholder="do" value={filters.maxPrice || ''}
+                onChange={e => set({ maxPrice: parseInt(e.target.value) || 0 })}
+                style={{ width: 72, padding: '4px 7px', border: '1px solid var(--c-border)', borderRadius: 6, fontSize: 12, outline: 'none', color: 'var(--c-text)' }} />
+            </div>
           </Section>
 
           <Section label="Min. plocha" hint="jedna hodnota">

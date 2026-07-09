@@ -8,10 +8,10 @@ export const TRANSIT_COLORS: Record<TransitStatus, string> = {
 }
 
 export const LINE_COLORS: Record<string, string> = {
-  A: '#00a562', B: '#f5a623', C: '#e2001a',
+  A: '#00a562', B: '#f5a623', C: '#e2001a', D: '#2563eb',
 }
 
-export const TRAM_COLOR = '#2563eb'
+export const TRAM_COLOR = '#8B4513'
 
 export function lineColor(line: string): string {
   return LINE_COLORS[line] ?? TRAM_COLOR
@@ -34,11 +34,13 @@ export function activeFilterCount(filters: import('./types').SearchFilters): num
     filters.transitLines.length +
     filters.propertyTypes.length +
     filters.districts.length +
+    (filters.minPrice ? 1 : 0) +
     (filters.maxPrice ? 1 : 0) +
     (filters.minArea ? 1 : 0) +
     (filters.furnished ? 1 : 0) +
     (filters.petsAllowed ? 1 : 0) +
     (filters.parking ? 1 : 0) +
-    (filters.balcony ? 1 : 0)
+    (filters.balcony ? 1 : 0) +
+    (filters.filterByMapArea ? 1 : 0)
   )
 }

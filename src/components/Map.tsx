@@ -3,6 +3,7 @@ import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { ListingSearchResult, TransitStatus } from '../lib/types'
 import { lineColor } from '../lib/utils'
+import { DISTRICT_POLYGONS } from '../lib/districts'  // re-exported via districts.ts
 
 const COLORS: Record<TransitStatus, string> = {
   green: '#16a34a', yellow: '#ca8a04', red: '#dc2626', grey: '#9ca3af',
@@ -46,39 +47,6 @@ async function fetchLineGeoJSON(line: string): Promise<GeoJSON.GeoJSON> {
   }
 }
 
-// Prague district polygons - replace with real GeoJSON after uploading to pid-data bucket
-// Source for accurate data: https://github.com/blaka/prague-districts-geojson
-// const DISTRICT_POLYGONS: Record<string, [number, number][]> = {
-//   'Praha 1': [[14.3912,50.0947],[14.4052,50.0947],[14.4312,50.0892],[14.4401,50.0823],[14.4298,50.0736],[14.4148,50.0703],[14.3948,50.0748],[14.3828,50.0848],[14.3912,50.0947]],
-//   'Praha 2': [[14.4148,50.0703],[14.4298,50.0736],[14.4540,50.0712],[14.4628,50.0617],[14.4438,50.0543],[14.4228,50.0576],[14.4088,50.0668],[14.4148,50.0703]],
-//   'Praha 3': [[14.4298,50.0736],[14.4401,50.0823],[14.4701,50.0858],[14.5001,50.0778],[14.4901,50.0668],[14.4628,50.0617],[14.4298,50.0736]],
-//   'Praha 4': [[14.4088,50.0668],[14.4228,50.0576],[14.4628,50.0617],[14.4784,50.0186],[14.4438,50.0150],[14.4088,50.0300],[14.3988,50.0500],[14.4088,50.0668]],
-//   'Praha 5': [[14.3388,50.0510],[14.3988,50.0500],[14.4088,50.0668],[14.3948,50.0748],[14.3828,50.0848],[14.3628,50.0810],[14.3388,50.0710],[14.3388,50.0510]],
-//   'Praha 6': [[14.3388,50.0710],[14.3628,50.0810],[14.3828,50.0848],[14.3912,50.0947],[14.3808,50.1147],[14.3508,50.1147],[14.3208,50.1047],[14.3208,50.0847],[14.3388,50.0710]],
-//   'Praha 7': [[14.4052,50.0947],[14.4352,50.0947],[14.4552,50.1047],[14.4552,50.1147],[14.4152,50.1147],[14.3808,50.1147],[14.3912,50.0947],[14.4052,50.0947]],
-//   'Praha 8': [[14.4352,50.0947],[14.4552,50.1047],[14.5052,50.1147],[14.5252,50.1047],[14.5052,50.0847],[14.4701,50.0858],[14.4401,50.0823],[14.4352,50.0947]],
-//   'Praha 9': [[14.5052,50.0847],[14.5252,50.1047],[14.5652,50.1047],[14.5652,50.0847],[14.5452,50.0747],[14.5052,50.0747],[14.5052,50.0847]],
-//   'Praha 10':[[14.4628,50.0617],[14.4901,50.0668],[14.5201,50.0668],[14.5201,50.0468],[14.4901,50.0368],[14.4628,50.0417],[14.4628,50.0617]],
-//   'Vinohrady':[[14.4298,50.0736],[14.4628,50.0617],[14.4540,50.0712],[14.4401,50.0823],[14.4298,50.0736]],
-//   'Žižkov':  [[14.4401,50.0823],[14.4701,50.0858],[14.4801,50.0758],[14.4628,50.0617],[14.4401,50.0823]],
-//   'Holešovice':[[14.4152,50.0947],[14.4552,50.1047],[14.4552,50.1147],[14.4152,50.1147],[14.4152,50.0947]],
-//   'Smíchov': [[14.3828,50.0648],[14.4028,50.0648],[14.4148,50.0703],[14.4088,50.0668],[14.3988,50.0500],[14.3688,50.0548],[14.3828,50.0648]],
-//   'Dejvice':  [[14.3508,50.0947],[14.3908,50.0978],[14.3912,50.0947],[14.3808,50.1047],[14.3508,50.1047],[14.3508,50.0947]],
-//   'Bubeneč':  [[14.3908,50.0978],[14.4152,50.0947],[14.4152,50.1147],[14.3808,50.1147],[14.3808,50.1047],[14.3908,50.0978]],
-//   'Karlín':   [[14.4401,50.0823],[14.4701,50.0858],[14.4701,50.0958],[14.4552,50.1047],[14.4352,50.0947],[14.4401,50.0823]],
-//   'Nusle':    [[14.4228,50.0576],[14.4628,50.0617],[14.4628,50.0417],[14.4228,50.0376],[14.4028,50.0476],[14.4228,50.0576]],
-//   'Vršovice': [[14.4540,50.0712],[14.4628,50.0617],[14.4828,50.0617],[14.4828,50.0717],[14.4628,50.0817],[14.4540,50.0712]],
-//   'Košíře':   [[14.3388,50.0510],[14.3688,50.0548],[14.3988,50.0500],[14.3988,50.0300],[14.3688,50.0200],[14.3388,50.0310],[14.3388,50.0510]],
-//   'Modřany':  [[14.3988,50.0300],[14.4388,50.0150],[14.4538,49.9950],[14.4088,49.9850],[14.3788,49.9950],[14.3688,50.0150],[14.3988,50.0300]],
-//   'Letňany':  [[14.5052,50.1147],[14.5452,50.1347],[14.5652,50.1247],[14.5652,50.1047],[14.5052,50.1047],[14.5052,50.1147]],
-//   'Chodov':   [[14.4629,50.0251],[14.4960,50.0128],[14.5060,49.9928],[14.4660,49.9828],[14.4429,49.9928],[14.4429,50.0151],[14.4629,50.0251]],
-//   'Prosek':   [[14.4837,50.1093],[14.5237,50.1293],[14.5437,50.1193],[14.5237,50.0993],[14.4837,50.0993],[14.4837,50.1093]],
-//   'Braník':   [[14.3988,50.0300],[14.4388,50.0300],[14.4388,50.0100],[14.3988,50.0100],[14.3788,50.0200],[14.3988,50.0300]],
-//   'Řepy':     [[14.2896,50.0539],[14.3296,50.0739],[14.3496,50.0639],[14.3296,50.0439],[14.2896,50.0339],[14.2896,50.0539]],
-//   'Zbraslav': [[14.3788,49.9650],[14.4188,49.9650],[14.4388,49.9450],[14.3988,49.9250],[14.3588,49.9350],[14.3588,49.9550],[14.3788,49.9650]],
-//   'Střešovice':[[14.3508,50.0947],[14.3908,50.0978],[14.3908,50.0878],[14.3708,50.0778],[14.3508,50.0878],[14.3508,50.0947]],
-// }
-
 interface Props {
   listings: ListingSearchResult[]
   highlightedId: string | null
@@ -86,9 +54,12 @@ interface Props {
   onBoundsChange: (bbox: { west: number; south: number; east: number; north: number }) => void
   activeLines: string[]
   activeDistricts: string[]
+  isochronePolygon?: [number, number][] | null
+  isochroneCenter?: { lat: number; lng: number } | null
+  onIsochroneClick?: (lat: number, lng: number) => void
 }
 
-export function Map({ listings, highlightedId, onMarkerClick, onBoundsChange, activeLines, activeDistricts }: Props) {
+export function Map({ listings, highlightedId, onMarkerClick, onBoundsChange, activeLines, activeDistricts, isochronePolygon, isochroneCenter, onIsochroneClick }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const markersRef = useRef<globalThis.Map<string, maplibregl.Marker>>(new globalThis.Map())
@@ -146,6 +117,57 @@ export function Map({ listings, highlightedId, onMarkerClick, onBoundsChange, ac
     activeLayerIds.current = newIds
   }, [removeOverlays])
 
+  // ── Isochrone center marker ──
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    let marker: maplibregl.Marker | null = null
+    if (isochroneCenter) {
+      const el = document.createElement('div')
+      el.style.cssText = 'width:16px;height:16px;border-radius:50%;background:#2563eb;border:3px solid white;box-shadow:0 0 0 2px #2563eb;cursor:pointer;'
+      marker = new maplibregl.Marker({ element: el })
+        .setLngLat([isochroneCenter.lng, isochroneCenter.lat])
+        .addTo(map)
+    }
+    return () => { if (marker) marker.remove() }
+  }, [isochroneCenter])
+
+  // ── Isochrone polygon overlay ──
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    const renderIso = () => {
+      const isoId = 'isochrone-fill'
+      const isoLineId = 'isochrone-line'
+      if (map.getLayer(isoId)) map.removeLayer(isoId)
+      if (map.getLayer(isoLineId)) map.removeLayer(isoLineId)
+      if (map.getSource('isochrone')) map.removeSource('isochrone')
+      if (isochronePolygon && isochronePolygon.length >= 3) {
+        map.addSource('isochrone', {
+          type: 'geojson',
+          data: {
+            type: 'Feature',
+            properties: {},
+            geometry: { type: 'Polygon', coordinates: [isochronePolygon] }
+          }
+        })
+        map.addLayer({
+          id: isoId, type: 'fill', source: 'isochrone',
+          paint: { 'fill-color': '#2563eb', 'fill-opacity': 0.08 }
+        })
+        map.addLayer({
+          id: isoLineId, type: 'line', source: 'isochrone',
+          paint: { 'line-color': '#2563eb', 'line-width': 2.5, 'line-opacity': 0.6, 'line-dasharray': [4, 3] }
+        })
+      }
+    }
+    if (!map.isStyleLoaded()) {
+      map.once('style.load', renderIso)
+      return
+    }
+    renderIso()
+  }, [isochronePolygon])
+
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
     const map = new maplibregl.Map({
@@ -157,6 +179,13 @@ export function Map({ listings, highlightedId, onMarkerClick, onBoundsChange, ac
     map.on('moveend', () => {
       const b = map.getBounds()
       onBoundsChange({ west: b.getWest(), south: b.getSouth(), east: b.getEast(), north: b.getNorth() })
+    })
+    map.on('click', (e) => {
+      // Check if click hit a marker — if so, let marker click handle it
+      const features = map.queryRenderedFeatures(e.point)
+      if (onIsochroneClick && !features.some(f => f.source === 'listings')) {
+        onIsochroneClick(e.lngLat.lat, e.lngLat.lng)
+      }
     })
     map.on('load', () => addOverlays(map, activeLines, activeDistricts))
     mapRef.current = map
@@ -176,17 +205,23 @@ export function Map({ listings, highlightedId, onMarkerClick, onBoundsChange, ac
     markersRef.current.forEach((m, id) => {
       if (!ids.has(id)) { m.remove(); markersRef.current.delete(id) }
     })
+
     listings.forEach(l => {
       if (!l.lat || !l.lng || markersRef.current.has(l.listing_id)) return
       const el = document.createElement('div')
-      el.style.cssText = `width:28px;height:28px;border-radius:50%;background:${COLORS[l.transit_status]};border:2.5px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.22);cursor:pointer;transition:transform 0.13s;`
+      el.style.cssText = `cursor:pointer;`
+      const inner = document.createElement('div')
+      inner.style.cssText = `width:28px;height:28px;border-radius:50%;background:${COLORS[l.transit_status]};border:2.5px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.22);transition:transform 0.13s;`
+      el.appendChild(inner)
+
       el.addEventListener('click', () => onMarkerClick(l.listing_id))
-      el.addEventListener('mouseenter', () => { el.style.transform = 'scale(1.2)' })
-      el.addEventListener('mouseleave', () => { el.style.transform = 'scale(1)' })
+      el.addEventListener('mouseenter', () => { inner.style.transform = 'scale(1.2)' })
+      el.addEventListener('mouseleave', () => { inner.style.transform = 'scale(1)' })
+
       const marker = new maplibregl.Marker({ element: el })
         .setLngLat([l.lng, l.lat])
         .setPopup(new maplibregl.Popup({ offset: 16, closeButton: false })
-          .setHTML(`<div style="font-family:inherit"><div style="font-size:12px;font-weight:600">${l.title}</div><div style="font-size:11px;color:#64748b;margin-top:2px">${l.price_total_czk.toLocaleString('cs-CZ')} Kč · ${l.area_sqm} m²</div></div>`))
+        .setHTML(`<strong>${l.title}</strong><br>${l.price_total_czk.toLocaleString('cs-CZ')} Kč · ${l.area_sqm} m²`))
         .addTo(map)
       markersRef.current.set(l.listing_id, marker)
     })
@@ -195,16 +230,18 @@ export function Map({ listings, highlightedId, onMarkerClick, onBoundsChange, ac
   useEffect(() => {
     markersRef.current.forEach((m, id) => {
       const el = m.getElement()
-      el.style.transform = id === highlightedId ? 'scale(1.25)' : 'scale(1)'
-      el.style.zIndex = id === highlightedId ? '10' : '1'
+      const inner = el.firstElementChild as HTMLElement
+      if (!inner) return
+      inner.style.transform = id === highlightedId ? 'scale(1.25)' : 'scale(1)'
+      inner.style.zIndex = id === highlightedId ? '10' : '1'
     })
-  }, [highlightedId])
+  }, [highlightedId]) 
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
       <div style={{ position: 'absolute', bottom: 12, left: 12, background: 'white', border: '1px solid var(--c-border)', borderRadius: 9, padding: '8px 11px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', fontSize: 11, pointerEvents: 'none' }}>
-        {([['#16a34a','V oblasti ≤500 m'],['#ca8a04','V oblasti >500 m'],['#dc2626','Na lince, mimo'],['#9ca3af','Mimo oblast']] as [string,string][]).map(([color, label]) => (
+        {([['#16a34a','V oblasti + u linky'],['#ca8a04','V oblasti, mimo linku'],['#dc2626','U linky, mimo oblast'],['#9ca3af','Ostatní']] as [string,string][]).map(([color, label]) => (
           <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />
             <span style={{ color: 'var(--c-muted)' }}>{label}</span>

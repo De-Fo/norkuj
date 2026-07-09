@@ -7,13 +7,16 @@ import { CreateListingPage } from './pages/CreateListing'
 import { ListingDetail } from './pages/ListingDetail'
 import { AdminPanel } from './pages/AdminPanel'
 import { Wordmark } from './components/Wordmark'
+import { ProfilePage } from './pages/Profile'
 import type { SearchFilters } from './lib/types'
 import { DEFAULT_FILTERS } from './lib/types'
+import { MyListingsPage } from './pages/MyListings'
+import type { Listing } from './lib/types'
 
-const ADMIN_UIDS = import.meta.env.VITE_PANEL_ADMIN_UIDS;
+const ADMIN_UIDS = (import.meta.env.VITE_ADMIN_UIDS ?? '').split(',').map((s: string) => s.trim()).filter(Boolean)
 
+type Route = 'search' | 'auth' | 'profile' | 'my-listings'
 
-type Route = 'search' | 'auth'
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null)
@@ -24,6 +27,7 @@ export default function App() {
   const [showCreate, setShowCreate] = useState(false)
   const [showAdmin, setShowAdmin] = useState(false)
   const [selectedListingId, setSelectedListingId] = useState<string | null>(null)
+  const [editingListing, setEditingListing] = useState<Listing | null>(null)
 
   useEffect(() => {
     if (window.innerWidth < 768) setShowMap(false)
@@ -48,7 +52,23 @@ export default function App() {
     </div>
   )
 
-  if (route === 'auth') return <AuthPage />
+  if (route === 'my-listings') {
+  return (
+    <MyListingsPage
+      user={user}
+      onBack={() => setRoute('search')}
+      onEdit={(listing) => {
+        setEditingListing(listing)
+        setShowCreate(true)
+        setRoute('search')   // ← added: must leave the early-return route first
+      }}
+    />
+  )
+}
+
+
+  if (route === 'auth') return <AuthPage onBack={() => setRoute('search')} />
+  if (route === 'profile') return <ProfilePage user={user} onBack={() => setRoute('search')} />
 
   const isAdmin = user ? ADMIN_UIDS.includes(user.id) : false
 
@@ -82,6 +102,18 @@ export default function App() {
               }}>
                 + Přidat inzerát
               </button>
+              <button onClick={() => setRoute('my-listings')} style={{
+                padding: '6px 11px', background: 'transparent', color: 'var(--c-muted)',
+                border: '1px solid var(--c-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer',
+              }}>
+                Moje inzeráty
+              </button>
+              <button onClick={() => setRoute('profile')} style={{
+                padding: '6px 11px', background: 'transparent', color: 'var(--c-muted)',
+                border: '1px solid var(--c-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer',
+              }}>
+                Nastavení profilu
+              </button>
               <button onClick={() => supabase.auth.signOut()} style={{
                 padding: '6px 11px', background: 'transparent', color: 'var(--c-muted)',
                 border: '1px solid var(--c-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer',
@@ -110,18 +142,21 @@ export default function App() {
           onChange={setFilters}
           showMap={showMap}
           onToggleMap={() => setShowMap(v => !v)}
-          onListingClick={(id) => setSelectedListingId(id)}
-        />
+          onListingClick={id => setSelectedListingId(id)}        />
       </main>
 
       {showCreate && (
-        <CreateListingPage onDone={() => setShowCreate(false)} />
+        <CreateListingPage
+          onDone={() => { setShowCreate(false); setEditingListing(null) }}
+          editListing={editingListing}
+        />
       )}
 
       {selectedListingId && (
         <ListingDetail
           listingId={selectedListingId}
           onClose={() => setSelectedListingId(null)}
+          onRequestAuth={() => setRoute('auth')}
         />
       )}
 
