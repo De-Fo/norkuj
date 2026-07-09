@@ -233,14 +233,26 @@ export function ListingDetail({ listingId, onClose, onRequestAuth }: Props) {
                   <p style={{ fontSize: 14, lineHeight: 1.7, whiteSpace: 'pre-wrap', color: '#0f172a', margin: 0 }}>{listing.description}</p>
                 </div>
 
-                {/* Mini map */}
-                {listing.location && (listing.location as any)?.coordinates && (
-                  <MiniMap
-                    lat={(listing.location as any).coordinates[1]}
-                    lng={(listing.location as any).coordinates[0]}
-                    title={listing.title}
-                  />
-                )}
+                {/* Mini map — extract from PostGIS GeoJSON or WKT */}
+                {(() => {
+                  const loc = (listing as any).location
+                  let _lat: number | null = null
+                  let _lng: number | null = null
+                  if (loc) {
+                    // GeoJSON: {type:"Point",coordinates:[lng,lat]}
+                    if (loc.coordinates && Array.isArray(loc.coordinates)) {
+                      _lng = loc.coordinates[0]; _lat = loc.coordinates[1]
+                    }
+                    // WKT string fallback: "POINT(lng lat)"
+                    if (_lat == null && typeof loc === 'string') {
+                      const m = loc.match(/POINT\(([-\d.]+)\s+([-\d.]+)\)/)
+                      if (m) { _lng = parseFloat(m[1]); _lat = parseFloat(m[2]) }
+                    }
+                  }
+                  return _lat != null && _lng != null ? (
+                    <MiniMap lat={_lat} lng={_lng} title={listing.title} />
+                  ) : null
+                })()}
 
                 {/* Thumbnail strip */}
                 {listing.image_paths && listing.image_paths.length > 1 && (

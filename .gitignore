@@ -30,5 +30,4 @@ dist-ssr
 .mcp.json
 scripts
 skills-lock.json
-.PID_GTFS
-PID_GTFS
+datasets/PID_GTFSdatasets/PID_GTFS/
