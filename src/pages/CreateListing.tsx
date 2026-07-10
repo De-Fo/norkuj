@@ -445,6 +445,13 @@ export function CreateListingPage({ onDone, editListing }: Props) {
                       )}
                     </div>
                     <div>
+                      <label style={label}>Přesná poloha — klikni na mapu *</label>
+                      <div ref={mapContainerRef} style={{ height: 280, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--c-border)' }} />
+                      {form.lat
+                        ? <p style={{ fontSize: 11, color: '#15803d', marginTop: 6 }}>✓ Poloha označena ({form.lat.toFixed(5)}, {form.lng?.toFixed(5)})</p>
+                        : <p style={{ fontSize: 11, color: 'var(--c-faint)', marginTop: 6 }}>Klikni na mapu pro označení polohy</p>}
+                    </div>
+                    <div>
                       <label style={label}>Čtvrť / Část Prahy * <span style={{fontWeight:400,color:'var(--c-faint)'}}>lze vybrat 1–2</span></label>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                         {DISTRICTS.map(d => {
@@ -474,13 +481,6 @@ export function CreateListingPage({ onDone, editListing }: Props) {
                       {form.address_districts.length === 0 && (
                         <p style={{ fontSize: 11, color: 'var(--c-faint)', marginTop: 4 }}>Vyber alespoň 1 oblast</p>
                       )}
-                    </div>
-                    <div>
-                      <label style={label}>Přesná poloha — klikni na mapu *</label>
-                      <div ref={mapContainerRef} style={{ height: 280, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--c-border)' }} />
-                      {form.lat
-                        ? <p style={{ fontSize: 11, color: '#15803d', marginTop: 6 }}>✓ Poloha označena ({form.lat.toFixed(5)}, {form.lng?.toFixed(5)})</p>
-                        : <p style={{ fontSize: 11, color: 'var(--c-faint)', marginTop: 6 }}>Klikni na mapu pro označení polohy</p>}
                     </div>
                   </div>
                 )}

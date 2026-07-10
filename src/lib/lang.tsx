@@ -119,6 +119,11 @@ const cs: Record<string, string> = {
   '_detail_location': 'Poloha na mapě',
   '_detail_month': 'měs.',
   '_detail_floor_prefix': '. patro',
+  '_cookies_title': 'Nastavení cookies',
+  '_cookies_text': 'Používáme nezbytné cookies pro základní fungování a Google Analytics pro anonymní statistiky návštěvnosti. Analytické cookies se načítají pouze s vaším výslovným souhlasem.',
+  '_cookies_link': 'Zásady cookies',
+  '_cookies_accept': 'Přijmout',
+  '_cookies_reject': 'Odmítnout',
 }
 
 const en: Record<string, string> = {
@@ -220,6 +225,11 @@ const en: Record<string, string> = {
   '_detail_location': 'Location on map',
   '_detail_month': 'mo.',
   '_detail_floor_prefix': 'th floor',
+  '_cookies_title': 'Cookie Consent',
+  '_cookies_text': 'We use essential cookies for basic functionality and Google Analytics for anonymous usage statistics. Analytics cookies are only loaded with your explicit consent.',
+  '_cookies_link': 'Cookie Policy',
+  '_cookies_accept': 'Accept',
+  '_cookies_reject': 'Reject',
 }
 
 export function LangProvider({ children }: { children: ReactNode }) {

@@ -33,10 +33,18 @@ export const DISTRICT_GROUPS: DistrictGroup[] = [
 ]
 
 // All unique district names flat (groups + children)
+// Sorted: Praha 1–22 first (numerically), then alphabetically
 export const ALL_DISTRICTS: string[] = Array.from(new Set([
   ...DISTRICT_GROUPS.map(g => g.group),
   ...DISTRICT_GROUPS.flatMap(g => g.children),
-])).sort()
+])).sort((a, b) => {
+  const aMatch = a.match(/^Praha (\d+)$/)
+  const bMatch = b.match(/^Praha (\d+)$/)
+  if (aMatch && bMatch) return parseInt(aMatch[1]) - parseInt(bMatch[1])
+  if (aMatch) return -1
+  if (bMatch) return 1
+  return a.localeCompare(b)
+})
 
 // Expand selected districts — if a group is selected, also include all its children.
 // A child (e.g. Vinohrady) can belong to multiple parents, so this stays correct

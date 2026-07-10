@@ -13,6 +13,7 @@ import { DEFAULT_FILTERS } from './lib/types'
 import { MyListingsPage } from './pages/MyListings'
 import type { Listing } from './lib/types'
 import { useLang } from './lib/lang'
+import { CookieConsent } from './components/CookieConsent'
 
 const ADMIN_UIDS = (import.meta.env.VITE_ADMIN_UIDS ?? '').split(',').map((s: string) => s.trim()).filter(Boolean)
 
@@ -206,7 +207,7 @@ export default function App() {
                 {isMobile ? '👤' : t('login')}
               </button>
               <button onClick={() => setRoute('auth')} style={{
-                height: 32, padding: '0 12px', background: 'var(--c-text)', color: 'white',
+                height: 32, padding: '0 12px', background: 'darkblue', color: 'white',
                 border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 500, cursor: 'pointer',
               }}>
                 {isMobile ? '➕' : t('register')}
@@ -269,6 +270,9 @@ export default function App() {
       {showAdmin && (
         <AdminPanel onClose={() => setShowAdmin(false)} />
       )}
+
+      {/* ═══ Cookie consent ═══ */}
+      <CookieConsent />
 
       {/* ═══ GLOBAL STYLES ═══ */}
       <style>{`

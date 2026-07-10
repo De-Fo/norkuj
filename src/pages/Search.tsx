@@ -364,8 +364,7 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
                   const m = Math.max(1, Math.min(120, parseInt(e.target.value) || 1))
                   setIsoMinutes(m)
                   if (isoCenter && e.target.value) {
-                    if ((window as any)._isoTimer) clearTimeout((window as any)._isoTimer)
-                    ;(window as any)._isoTimer = setTimeout(() => scheduleIsochrone(isoCenter.lat, isoCenter.lng, m), 500)
+                    scheduleIsochrone(isoCenter.lat, isoCenter.lng, m)
                   }
                 }}
                 style={{

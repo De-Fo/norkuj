@@ -95,7 +95,6 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
         return
       }
 
-      console.log('[ListingDetail] fetched:', data.title, 'status:', data.status)
       setListing(data as FullListing)
       setLoading(false)
     }
