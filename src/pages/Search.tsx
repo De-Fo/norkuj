@@ -5,7 +5,7 @@ import { ListingCard } from '../components/ListingCard'
 import { Map } from '../components/Map'
 import { FilterPanel } from '../components/FilterPanel'
 import { expandDistricts } from '../lib/districts'
-import { convexHull, expandHull, pointInConvexPolygon } from '../lib/isochrone'
+import { pointInConvexPolygon } from '../lib/isochrone'
 import { Footer } from '../components/Footer'
 import { useLang } from '../lib/lang'
 
@@ -24,12 +24,9 @@ interface Props {
   onListingClick: (id: string) => void
   isMobile?: boolean
   isochroneAutoShowMap?: () => void
-  user?: any | null
-  favoriteIds?: Set<string>
-  onToggleFavorite?: (id: string) => void
 }
 
-export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingClick, isMobile, isochroneAutoShowMap, user, favoriteIds, onToggleFavorite }: Props) {
+export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingClick, isMobile, isochroneAutoShowMap }: Props) {
   const { t } = useLang()
   const [listings, setListings] = useState<ListingSearchResult[]>([])
   const [loading, setLoading] = useState(false)
@@ -43,6 +40,7 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
   const listRef = useRef<HTMLDivElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isoFetchRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isoReqRef = useRef(0)
 
   const fetchListings = useCallback(async (f: SearchFilters, b: BBox | null) => {
     // ═══════════════════════════════════════════════════════════════
@@ -221,39 +219,34 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
   }, [filters, bbox, fetchListings])
 
   const handleMarkerClick = useCallback((id: string) => {
+    setHighlightedId(id)
     onListingClick(id)
   }, [onListingClick])
 
   // ── Isochrone: fetch from Supabase RPC and compute polygon ──
   const fetchIsochrone = useCallback(async (lat: number, lng: number, minutes: number) => {
+    const reqNo = ++isoReqRef.current
     setIsoLoading(true)
     try {
-      console.log('[Isochrone] fetching for', lat, lng, minutes + 'min')
-      const { data, error } = await (supabase.rpc as any)('calculate_isochrone', {
+      const { data, error } = await (supabase.rpc as any)('calculate_isochrone_polygon', {
         p_lat: lat,
         p_lng: lng,
         p_minutes: minutes,
+        p_num_bins: 72,
       })
-      console.log('[Isochrone] got', data?.length ?? 0, 'stops, error:', error)
-      if (error || !data || data.length === 0) {
-        console.error('[Isochrone] no stops returned:', error)
+      // Discard stale response if a newer request was already started
+      if (reqNo !== isoReqRef.current) {
+        return
+      }
+      if (error || !data || (data as any[]).length < 3) {
+        console.error('[Isochrone] no polygon returned:', error)
         setIsoPolygon(null)
         return
       }
-      // Build convex hull from stop coordinates [lng, lat]
-      const points: [number, number][] = (data as any[])
-        .filter((s: any) => s.stop_lat && s.stop_lon)
-        .map((s: any) => [s.stop_lon, s.stop_lat])
-      if (points.length >= 3) {
-        const hull = convexHull(points)
-        const expanded = expandHull(hull, 0.003)
-        console.log('[Isochrone] polygon created:', hull.length, 'hull pts ->', expanded.length, 'expanded pts')
-        setIsoPolygon(expanded)
-      } else {
-        console.warn('[Isochrone] only', points.length, 'points, need >= 3')
-        setIsoPolygon(null)
-      }
+      const rawArr = data as [number, number][]
+      setIsoPolygon(rawArr)
     } catch (err) {
+      if (reqNo !== isoReqRef.current) return
       console.error('[Isochrone] fetch failed:', err)
       setIsoPolygon(null)
     }

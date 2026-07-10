@@ -18,7 +18,7 @@ export function ProfilePage({ user, onBack }: Props) {
 
   useEffect(() => {
     if (!user) return
-    supabase.from('profiles').select('*').eq('id', user.id).maybeSingle().then(({ data }) => {
+    (supabase.from('profiles') as any).select('*').eq('id', user.id).maybeSingle().then(({ data }: any) => {
       if (data) {
         setProfile(data as Profile)
         setDisplayName(data.display_name ?? '')
@@ -31,7 +31,7 @@ export function ProfilePage({ user, onBack }: Props) {
   const handleSave = async () => {
     if (!user) return
     setSaving(true); setMsg(null)
-    const { error } = await supabase.from('profiles')
+    const { error } = await (supabase.from('profiles') as any)
       .update({ display_name: displayName, phone })
       .eq('id', user.id)
     setSaving(false)

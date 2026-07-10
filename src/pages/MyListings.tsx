@@ -52,14 +52,14 @@ export function MyListingsPage({ user, onBack, onEdit }: Props) {
   const handleDelete = async (id: string) => {
     if (!confirm('Opravdu chceš tento inzerát smazat? Tato akce je nevratná.')) return
     setBusyId(id)
-    await supabase.from('listings').update({ status: 'deleted' }).eq('id', id)
+    await (supabase.from('listings') as any).update({ status: 'deleted' }).eq('id', id)
     setBusyId(null)
     load()
   }
 
   const handleMarkRented = async (id: string) => {
     setBusyId(id)
-    await supabase.from('listings').update({ status: 'rented' }).eq('id', id)
+    await (supabase.from('listings') as any).update({ status: 'rented' }).eq('id', id)
     setBusyId(null)
     load()
   }

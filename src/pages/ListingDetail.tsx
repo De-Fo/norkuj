@@ -10,7 +10,7 @@ import { useLang } from '../lib/lang'
 const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY
 
 // ── Mini map showing the listing's location ──
-function MiniMap({ lat, lng, title }: { lat: number; lng: number; title: string }) {
+function MiniMap({ lat, lng }: { lat: number; lng: number; title: string }) {
   const { t } = useLang()
   const ref = useRef<HTMLDivElement>(null)
 
@@ -75,8 +75,8 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
 
     const doFetch = async () => {
       // First try: fetch as published (public)
-      let { data, error } = await supabase
-        .from('listings')
+      let { data, error } = await (supabase
+        .from('listings') as any)
         .select('*, owner:profiles(display_name, phone, email, avatar_url)')
         .eq('id', listingId)
         .maybeSingle()

@@ -210,20 +210,18 @@ export function CreateListingPage({ onDone, editListing }: Props) {
       }
 
       if (isEdit) {
-        const { error: updErr } = await supabase
-          .from('listings')
+        const { error: updErr } = await (supabase.from('listings') as any)
           .update({
             ...payload,
             status: 'pending_review',
             rejection_reason: null,
-          } as any)
+          })
           .eq('id', editListing!.id)
           .eq('owner_id', user.id)
         if (updErr) throw updErr
       } else {
-        const { error: insErr } = await supabase
-          .from('listings')
-          .insert([{ ...payload, owner_id: user.id, status: 'pending_review' }] as any)
+        const { error: insErr } = await (supabase.from('listings') as any)
+          .insert([{ ...payload, owner_id: user.id, status: 'pending_review' }])
         if (insErr) throw insErr
       }
 

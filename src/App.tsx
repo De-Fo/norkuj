@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
 import { SearchPage } from './pages/Search'
@@ -231,7 +231,6 @@ export default function App() {
       <main style={{ flex: 1, overflow: 'hidden', display: 'flex', position: 'relative' }}>
         {route === 'favorites' ? (
           <FavoritesPage
-            user={user}
             listingIds={Array.from(favoritesIds)}
             onListingClick={id => { setSelectedListingId(id); setRoute('search') }}
           />
@@ -244,9 +243,6 @@ export default function App() {
             onListingClick={id => setSelectedListingId(id)}
             isMobile={isMobile}
             isochroneAutoShowMap={() => { if (isMobile) setShowMap(true) }}
-            user={user}
-            favoriteIds={favoritesIds}
-            onToggleFavorite={toggleFavorite}
           />
         )}
       </main>
@@ -354,8 +350,7 @@ export default function App() {
 }
 
 // ═══ Favorites page ═══
-function FavoritesPage({ user, listingIds, onListingClick }: {
-  user: User | null
+function FavoritesPage({ listingIds, onListingClick }: {
   listingIds: string[]
   onListingClick: (id: string) => void
 }) {

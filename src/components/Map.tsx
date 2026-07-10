@@ -23,9 +23,10 @@ const FALLBACK_ROUTES: Record<string, [number, number][]> = {
   '17': [[14.4319,50.1000],[14.4165,50.0864],[14.4073,50.0787],[14.4145,50.0819],[14.4189,50.0735],[14.4270,50.0653]],
 }
 
-const geojsonCache: Record<string, GeoJSON.GeoJSON> = {}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const geojsonCache: Record<string, any> = {}
 
-async function fetchLineGeoJSON(line: string): Promise<GeoJSON.GeoJSON> {
+async function fetchLineGeoJSON(line: string): Promise<any> {
   if (geojsonCache[line]) return geojsonCache[line]
   try {
     const res = await fetch(`${PID_GEOJSON_BASE}/line_${line}.geojson`)
@@ -35,7 +36,7 @@ async function fetchLineGeoJSON(line: string): Promise<GeoJSON.GeoJSON> {
     return data
   } catch {
     const coords = FALLBACK_ROUTES[line] ?? []
-    const fallback: GeoJSON.GeoJSON = {
+    const fallback = {
       type: 'FeatureCollection',
       features: [{
         type: 'Feature', properties: { line },
@@ -138,19 +139,23 @@ export function Map({ listings, highlightedId, onMarkerClick, onBoundsChange, ac
     return () => { if (marker) marker.remove() }
   }, [isochroneCenter])
 
-  // ── Isochrone polygon overlay ──
+  // ── Isochrone polygon overlay (strict-mode safe) ──
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+
     const renderIso = () => {
+      if (cancelled) return
       const isoId = 'isochrone-fill'
       const isoLineId = 'isochrone-line'
       try {
-        if (map.getLayer(isoId)) { map.removeLayer(isoId); map.removeLayer(isoLineId) }
+        if (map.getLayer(isoId)) map.removeLayer(isoId)
+        if (map.getLayer(isoLineId)) map.removeLayer(isoLineId)
         if (map.getSource('isochrone')) map.removeSource('isochrone')
-      } catch (e) { /* ignore if layers don't exist yet */ }
+      } catch (e) { /* ignore */ }
       if (isochronePolygon && isochronePolygon.length >= 3) {
-        console.log('[IsochroneMap] rendering polygon with', isochronePolygon.length, 'verts')
         map.addSource('isochrone', {
           type: 'geojson',
           data: {
@@ -167,19 +172,28 @@ export function Map({ listings, highlightedId, onMarkerClick, onBoundsChange, ac
           id: isoLineId, type: 'line', source: 'isochrone',
           paint: { 'line-color': '#2563eb', 'line-width': 3, 'line-opacity': 0.8, 'line-dasharray': [4, 3] }
         })
-      } else {
-        console.log('[IsochroneMap] no polygon to render')
       }
     }
-    if (!map.isStyleLoaded()) {
-      map.once('style.load', renderIso)
-      console.log('[IsochroneMap] waiting for style.load')
-      // Fallback: try again after a short delay
-      setTimeout(() => {
-        if (map.isStyleLoaded()) renderIso()
-      }, 500)
-    } else {
+
+    if (map.isStyleLoaded()) {
       renderIso()
+    } else {
+      map.once('style.load', renderIso)
+      // Fallback: if style.load never fires, try after 500ms
+      timer = setTimeout(() => {
+        if (!cancelled && map.isStyleLoaded()) renderIso()
+      }, 500)
+    }
+
+    return () => {
+      cancelled = true
+      if (timer !== undefined) clearTimeout(timer)
+      // Remove layers/sources so StrictMode remount starts clean
+      try {
+        if (map.getLayer('isochrone-fill')) map.removeLayer('isochrone-fill')
+        if (map.getLayer('isochrone-line')) map.removeLayer('isochrone-line')
+        if (map.getSource('isochrone')) map.removeSource('isochrone')
+      } catch { /* ignore */ }
     }
   }, [isochronePolygon])
 

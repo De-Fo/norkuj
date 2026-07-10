@@ -58,7 +58,7 @@ export function expandDistricts(selected: string[]): string[] {
 // The primary district selector is the chip grid below; suggestions are a bonus.
 export function suggestDistricts(address: string): string[] {
   if (!address || address.length < 3) return []
-  const lower = address.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, )
+  const lower = address.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
   const suggestions: string[] = []
 
   const add = (name: string) => { if (!suggestions.includes(name)) suggestions.push(name) }

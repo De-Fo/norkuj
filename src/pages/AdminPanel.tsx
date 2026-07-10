@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { PROPERTY_TYPE_LABELS } from '../lib/types'
+import { PROPERTY_TYPE_LABELS, type PropertyType } from '../lib/types'
 import { formatPrice, formatDate, getImageUrl } from '../lib/utils'
 
 const ADMIN_UIDS = (import.meta.env.VITE_ADMIN_UIDS ?? '').split(',').map((s: string) => s.trim()).filter(Boolean)
@@ -68,15 +68,13 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
     setLoading(true)
 
     // Fetch all for stats
-    const { data: allData } = await supabase
-      .from('listings')
-      .select('status')
+    const { data: allData } = await (supabase.from('listings').select('status') as any)
 
     if (allData) {
       setStats({
-        pending:   allData.filter(l => l.status === 'pending_review').length,
-        published: allData.filter(l => l.status === 'published').length,
-        rejected:  allData.filter(l => l.status === 'rejected').length,
+        pending:   (allData as any[]).filter((l: any) => l.status === 'pending_review').length,
+        published: (allData as any[]).filter((l: any) => l.status === 'published').length,
+        rejected:  (allData as any[]).filter((l: any) => l.status === 'rejected').length,
         total:     allData.length,
       })
     }
@@ -99,7 +97,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
       console.error('Admin fetch error:', error)
       setListings([])
     } else {
-      setListings((data ?? []) as AdminListing[])
+      setListings((data ?? []) as unknown as AdminListing[])
     }
 
     setLoading(false)
@@ -116,8 +114,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
 
   const approve = async (id: string) => {
     setActing(true)
-    const { error } = await supabase
-      .from('listings')
+    const { error } = await (supabase.from('listings') as any)
       .update({ status: 'published', published_at: new Date().toISOString() })
       .eq('id', id)
 
@@ -135,8 +132,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
   const reject = async (id: string) => {
     if (!rejectReason.trim()) { showMsg('Zadej důvod zamítnutí'); return }
     setActing(true)
-    const { error } = await supabase
-      .from('listings')
+    const { error } = await (supabase.from('listings') as any)
       .update({ status: 'rejected', rejection_reason: rejectReason.trim() })
       .eq('id', id)
 
@@ -154,8 +150,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
   const deleteL = async (id: string) => {
     if (!confirm('Opravdu smazat?')) return
     setActing(true)
-    const { error } = await supabase
-      .from('listings')
+    const { error } = await (supabase.from('listings') as any)
       .update({ status: 'deleted' })
       .eq('id', id)
 
@@ -254,7 +249,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
                   </span>
                 </div>
                 <div style={{ fontSize: 11, color: '#64748b', marginTop: 3 }}>
-                  {PROPERTY_TYPE_LABELS[l.property_type as any]} · {l.area_sqm} m² · {formatPrice(l.price_total_czk)}
+                  {PROPERTY_TYPE_LABELS[l.property_type as PropertyType]} · {l.area_sqm} m² · {formatPrice(l.price_total_czk)}
                 </div>
                 <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
                   {l.address_district} · {formatDate(l.created_at)}
@@ -291,7 +286,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
                 {[
                   ['Majitel',   selected.owner?.display_name ?? '—'],
                   ['Telefon',   selected.owner?.phone || '—'],
-                  ['Dispozice', PROPERTY_TYPE_LABELS[selected.property_type as any]],
+                  ['Dispozice', PROPERTY_TYPE_LABELS[selected.property_type as PropertyType]],
                   ['Plocha',    `${selected.area_sqm} m²`],
                   ['Cena',      formatPrice(selected.price_total_czk)],
                   ['Status',    STATUS_LABELS[selected.status]],

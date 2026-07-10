@@ -6,7 +6,6 @@ import { useLang } from '../lib/lang'
 
 const METRO_LINES = ['A', 'B', 'C']
 const TRAM_LINES = ['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','17','18','20','22','23','24','25','26']
-const PRICE_OPTS = [12000, 15000, 18000, 20000, 25000, 30000, 35000, 40000]
 const AREA_OPTS = [15, 25, 35, 50, 70, 100]
 const TYPE_ORDER: PropertyType[] = ['pokoj','1+kk','1+1','2+kk','2+1','3+kk','3+1','4+kk','4+1','atypical']
 

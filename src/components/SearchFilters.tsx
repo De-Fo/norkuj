@@ -1,5 +1,7 @@
-import { type SearchFilters, type PropertyType, DEFAULT_FILTERS } from '../lib/types'
-import { PROPERTY_TYPE_LABELS } from '../lib/utils'
+
+import type { SearchFilters } from '../lib/types'
+import type { PropertyType } from '../lib/types'
+import { DEFAULT_FILTERS, PROPERTY_TYPE_LABELS } from '../lib/types'
 
 const METRO_LINES = ['A', 'B', 'C']
 const TRAM_LINES = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '17', '18', '20', '22', '23', '24', '25', '26']
@@ -114,10 +116,10 @@ export function FilterPanel({ filters, onChange, resultCount, loading }: SearchF
           {Object.entries(PROPERTY_TYPE_LABELS).map(([key, label]) => (
             <button
               key={key}
-              onClick={() => set({ propertyType: filters.propertyType === key ? null : key as PropertyType })}
+              onClick={() => set({ propertyTypes: filters.propertyTypes?.includes(key as PropertyType) ? filters.propertyTypes.filter(t => t !== key) : [...(filters.propertyTypes || []), key as PropertyType] })}
               className={`
                 px-2.5 py-1 rounded-lg text-xs font-medium border transition-all
-                ${filters.propertyType === key
+                ${filters.propertyTypes?.includes(key as PropertyType)
                   ? 'bg-blue-600 text-white border-blue-600'
                   : 'bg-white text-gray-700 border-gray-200 hover:border-blue-400'}
               `}

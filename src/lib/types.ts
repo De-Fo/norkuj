@@ -145,6 +145,7 @@ export type Database = {
       profiles: { Row: Profile; Insert: Omit<Profile, 'created_at' | 'updated_at'>; Update: Partial<Profile> }
       listings: { Row: Listing; Insert: Omit<Listing, 'id' | 'price_total_czk' | 'created_at' | 'updated_at' | 'expires_at'>; Update: Partial<Listing> }
       pid_stations: { Row: PidStation; Insert: Omit<PidStation, 'id'>; Update: Partial<PidStation> }
+      favorites: { Row: { id: string; user_id: string; listing_id: string; created_at: string }; Insert: { user_id: string; listing_id: string }; Update: {} }
     }
     Functions: {
       search_listings_with_transit: {
