@@ -57,9 +57,11 @@ interface Props {
   isochronePolygon?: [number, number][] | null
   isochroneCenter?: { lat: number; lng: number } | null
   onIsochroneClick?: (lat: number, lng: number) => void
+  t?: (key: string) => string
 }
 
-export function Map({ listings, highlightedId, onMarkerClick, onBoundsChange, activeLines, activeDistricts, isochronePolygon, isochroneCenter, onIsochroneClick }: Props) {
+export function Map({ listings, highlightedId, onMarkerClick, onBoundsChange, activeLines, activeDistricts, isochronePolygon, isochroneCenter, onIsochroneClick, t: tFn }: Props) {
+  const t = tFn || ((s: string) => s)
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const markersRef = useRef<globalThis.Map<string, maplibregl.Marker>>(new globalThis.Map())
@@ -251,7 +253,7 @@ export function Map({ listings, highlightedId, onMarkerClick, onBoundsChange, ac
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
       <div style={{ position: 'absolute', bottom: 12, left: 12, background: 'white', border: '1px solid var(--c-border)', borderRadius: 9, padding: '8px 11px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', fontSize: 11, pointerEvents: 'none' }}>
-        {([['#16a34a','V obou oblastech'],['#ca8a04','Jen v městské části'],['#dc2626','Jen na trase linek'],['#9ca3af','Ostatní']] as [string,string][]).map(([color, label]) => (
+        {([['#16a34a', t('green')],['#ca8a04', t('yellow')],['#dc2626', t('red')],['#9ca3af', t('grey')]] as [string,string][]).map(([color, label]) => (
           <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />
             <span style={{ color: 'var(--c-muted)' }}>{label}</span>

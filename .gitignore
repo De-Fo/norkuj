@@ -34,3 +34,4 @@ datasets/PID_GTFS
 datasets/PID_GTFS/*
 datasets/bus_times_chunks/*
 bus_times.sql
+public

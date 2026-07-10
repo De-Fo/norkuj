@@ -50,23 +50,18 @@ interface Props {
   listingId: string
   onClose: () => void
   onRequestAuth?: () => void
+  user?: any | null
+  isFavorited?: boolean
+  onToggleFavorite?: (id: string) => void
 }
 
-export function ListingDetail({ listingId, onClose, onRequestAuth }: Props) {
+export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUser, isFavorited, onToggleFavorite }: Props) {
   const [listing, setListing] = useState<FullListing | null>(null)
   const [loading, setLoading] = useState(true)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [activeImg, setActiveImg] = useState(0)
   const [showContact, setShowContact] = useState(false)
-  const [user, setUser] = useState<any>(null)
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user))
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
-      setUser(session?.user ?? null)
-    })
-    return () => subscription.unsubscribe()
-  }, [])
+  const user = propUser
 
   useEffect(() => {
     if (!listingId) return
@@ -125,6 +120,23 @@ export function ListingDetail({ listingId, onClose, onRequestAuth }: Props) {
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
       <div style={{ width: '80%', maxWidth: 900, height: '85vh', background: 'white', borderRadius: 16, display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 24px 64px rgba(0,0,0,0.35)', position: 'relative' }}>
+
+        {/* Favorite star */}
+        {onToggleFavorite && propUser && (
+          <button onClick={() => onToggleFavorite(listingId)}
+            style={{
+              position: 'absolute', top: 12, right: 52, zIndex: 10,
+              width: 32, height: 32, borderRadius: '50%', border: 'none',
+              background: 'rgba(0,0,0,0.45)', color: isFavorited ? '#fbbf24' : 'white',
+              fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'transform 0.15s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.15)')}
+            onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
+          >
+            {isFavorited ? '★' : '☆'}
+          </button>
+        )}
 
         <button onClick={onClose} style={{ position: 'absolute', top: 12, right: 12, zIndex: 10, width: 32, height: 32, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.45)', color: 'white', fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
 

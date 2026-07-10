@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { SearchFilters, PropertyType } from '../lib/types'
 import { DEFAULT_FILTERS, PROPERTY_TYPE_LABELS, PRAGUE_DISTRICTS } from '../lib/types'
 import { lineColor, activeFilterCount } from '../lib/utils'
+import { useLang } from '../lib/lang'
 
 const METRO_LINES = ['A', 'B', 'C']
 const TRAM_LINES = ['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','17','18','20','22','23','24','25','26']
@@ -57,12 +58,14 @@ export function FilterPanel({ filters, onChange, resultCount, loading }: Props) 
   const set = (p: Partial<SearchFilters>) => onChange({ ...filters, ...p })
   const activeCount = activeFilterCount(filters)
 
+  const { t, lang } = useLang()
+
   const summary = [
-    filters.transitLines.length > 0 ? `${filters.transitLines.length} ${filters.transitLines.length === 1 ? 'linka' : 'linky'}` : null,
-    filters.districts.length > 0 ? `${filters.districts.length} ${filters.districts.length === 1 ? 'oblast' : 'oblasti'}` : null,
+    filters.transitLines.length > 0 ? `${filters.transitLines.length} ${filters.transitLines.length === 1 ? (t('_line') || 'linka') : (t('_lines') || 'linky')}` : null,
+    filters.districts.length > 0 ? `${filters.districts.length} ${filters.districts.length === 1 ? (t('_district') || 'oblast') : (t('_districts') || 'oblasti')}` : null,
     filters.propertyTypes.length > 0 ? filters.propertyTypes.map(t => PROPERTY_TYPE_LABELS[t]).join(', ') : null,
     (filters.minPrice || filters.maxPrice) ? `${filters.minPrice ? `${(filters.minPrice/1000).toFixed(0)}k` : ''}–${filters.maxPrice ? `${(filters.maxPrice/1000).toFixed(0)}k` : ''}` : null,
-    filters.filterByMapArea ? '🗺 mapa' : null,
+    filters.filterByMapArea ? '🗺 ' + t('map_filter_label').replace('🗺 ','') : null,
   ].filter(Boolean).join(' · ')
 
   return (
@@ -76,27 +79,33 @@ export function FilterPanel({ filters, onChange, resultCount, loading }: Props) 
           ))}
         </div>
         <span style={{ fontSize: 12, color: 'var(--c-muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {summary || 'Vyber linky, oblasti nebo filtry...'}
+          {summary || t('search_hint')}
         </span>
         <span style={{ fontSize: 11, color: 'var(--c-faint)' }}>
-          {loading ? 'Hledám...' : `${resultCount} inzerátů`}
+          {loading ? t('loading') : `${resultCount} ${t('listings_count')}`}
         </span>
         <span style={{
           fontSize: 11, color: 'var(--c-accent, #2563eb)', fontWeight: 500,
           padding: '3px 8px', borderRadius: 6,
           background: expanded ? 'rgba(37,99,235,0.08)' : 'transparent',
         }}>
-          {expanded ? '▲ Skrýt' : '▼ Filtry'}{activeCount > 0 ? ` (${activeCount})` : ''}
+          {expanded ? '▲ ' + t('hide_label') : '▼ ' + t('filters_label')}{activeCount > 0 ? ` (${activeCount})` : ''}
         </span>
       </div>
 
-      {expanded && (
-        <div style={{ padding: '0 12px 14px', display: 'flex', flexDirection: 'column', gap: 14, maxHeight: '60vh', overflowY: 'auto' }}>
+      <div style={{
+        overflow: 'hidden',
+        maxHeight: expanded ? '60vh' : '0',
+        opacity: expanded ? 1 : 0,
+        transition: 'max-height 0.35s ease, opacity 0.25s ease',
+        pointerEvents: expanded ? 'auto' : 'none',
+      }}>
+        <div style={{ padding: expanded ? '0 12px 14px' : '0 12px', display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto' }}>
 
           {/* Toggle switch for map-area filtering — always visible at top */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0' }}>
             <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--c-text)' }}>
-              🗺 Filtrovat dle pohybu mapy
+              {t('map_filter_label')}
             </span>
             <div onClick={() => set({ filterByMapArea: !filters.filterByMapArea })}
               style={{
@@ -113,7 +122,7 @@ export function FilterPanel({ filters, onChange, resultCount, loading }: Props) 
           </div>
           <div style={{ height: 1, background: 'var(--c-border)' }} />
 
-          <Section label="Metro" hint="lze vybrat víc">
+          <Section label={t('metro_label')} hint={t('multi_hint')}>
             {METRO_LINES.map(line => (
               <Chip key={line} active={filters.transitLines.includes(line)} color={lineColor(line)}
                 onClick={() => set({ transitLines: toggle(filters.transitLines, line) })}>
@@ -123,7 +132,7 @@ export function FilterPanel({ filters, onChange, resultCount, loading }: Props) 
             ))}
           </Section>
 
-          <Section label="Tramvaj" hint="lze vybrat víc">
+          <Section label={t('tram_label')} hint={t('multi_hint')}>
             {TRAM_LINES.map(t => (
               <Chip key={t} active={filters.transitLines.includes(t)}
                 onClick={() => set({ transitLines: toggle(filters.transitLines, t) })}>
@@ -132,7 +141,7 @@ export function FilterPanel({ filters, onChange, resultCount, loading }: Props) 
             ))}
           </Section>
 
-          <Section label="Oblast / čtvrť" hint="lze vybrat víc">
+          <Section label={t('district_label')} hint={t('multi_hint')}>
             {PRAGUE_DISTRICTS.map(d => (
               <Chip key={d} active={filters.districts.includes(d)}
                 onClick={() => set({ districts: toggle(filters.districts, d) })}>
@@ -141,7 +150,7 @@ export function FilterPanel({ filters, onChange, resultCount, loading }: Props) 
             ))}
           </Section>
 
-          <Section label="Dispozice" hint="lze vybrat víc">
+          <Section label={t('_floorplan')} hint={t('multi_hint')}>
             {TYPE_ORDER.map(t => (
               <Chip key={t} active={filters.propertyTypes.includes(t)}
                 onClick={() => set({ propertyTypes: toggle(filters.propertyTypes, t) })}>
@@ -150,19 +159,19 @@ export function FilterPanel({ filters, onChange, resultCount, loading }: Props) 
             ))}
           </Section>
 
-          <Section label="Nájem" hint="Kč">
+          <Section label={t('_rent')} hint={t('price_hint')}>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <input type="number" min={0} max={999999} placeholder="od" value={filters.minPrice || ''}
+              <input type="number" min={0} max={999999} placeholder={lang === 'en' ? 'from' : 'od'} value={filters.minPrice || ''}
                 onChange={e => set({ minPrice: parseInt(e.target.value) || 0 })}
                 style={{ width: 72, padding: '4px 7px', border: '1px solid var(--c-border)', borderRadius: 6, fontSize: 12, outline: 'none', color: 'var(--c-text)' }} />
               <span style={{ fontSize: 11, color: 'var(--c-faint)' }}>—</span>
-              <input type="number" min={0} max={999999} placeholder="do" value={filters.maxPrice || ''}
+              <input type="number" min={0} max={999999} placeholder={lang === 'en' ? 'to' : 'do'} value={filters.maxPrice || ''}
                 onChange={e => set({ maxPrice: parseInt(e.target.value) || 0 })}
                 style={{ width: 72, padding: '4px 7px', border: '1px solid var(--c-border)', borderRadius: 6, fontSize: 12, outline: 'none', color: 'var(--c-text)' }} />
             </div>
           </Section>
 
-          <Section label="Min. plocha" hint="jedna hodnota">
+          <Section label={t('min_area_label')} hint="m²">
             {AREA_OPTS.map(a => (
               <Chip key={a} active={filters.minArea === a} onClick={() => set({ minArea: filters.minArea === a ? 0 : a })}>
                 {a}+ m²
@@ -170,11 +179,11 @@ export function FilterPanel({ filters, onChange, resultCount, loading }: Props) 
             ))}
           </Section>
 
-          <Section label="Vybavení">
-            <Chip active={filters.furnished} onClick={() => set({ furnished: !filters.furnished })}>🛋 Zařízený</Chip>
-            <Chip active={filters.petsAllowed} onClick={() => set({ petsAllowed: !filters.petsAllowed })}>🐾 Zvířata</Chip>
-            <Chip active={filters.parking} onClick={() => set({ parking: !filters.parking })}>🅿 Parking</Chip>
-            <Chip active={filters.balcony} onClick={() => set({ balcony: !filters.balcony })}>🌿 Balkon</Chip>
+          <Section label={t('amenities_label')}>
+            <Chip active={filters.furnished} onClick={() => set({ furnished: !filters.furnished })}>{t('amenities_furnished')}</Chip>
+            <Chip active={filters.petsAllowed} onClick={() => set({ petsAllowed: !filters.petsAllowed })}>{t('amenities_pets')}</Chip>
+            <Chip active={filters.parking} onClick={() => set({ parking: !filters.parking })}>{t('amenities_parking')}</Chip>
+            <Chip active={filters.balcony} onClick={() => set({ balcony: !filters.balcony })}>{t('amenities_balcony')}</Chip>
           </Section>
 
           {activeCount > 0 && (
@@ -183,11 +192,11 @@ export function FilterPanel({ filters, onChange, resultCount, loading }: Props) 
               border: '1px solid var(--c-border)', borderRadius: 6, fontSize: 11,
               color: 'var(--c-muted)', cursor: 'pointer',
             }}>
-              ✕ Resetovat vše
+              {t('reset_label')}
             </button>
           )}
         </div>
-      )}
+      </div>
     </div>
   )
 }

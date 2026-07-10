@@ -8,28 +8,28 @@ export interface DistrictGroup {
 // Based on official Prague administrative division (22 správní obvody)
 // Source: praga-dom.com administrative breakdown + tmaps.one district mapping
 export const DISTRICT_GROUPS: DistrictGroup[] = [
-  { group: 'Praha 1', children: ['Josefov', 'Staré Město', 'Malá Strana', 'Hradčany'] },
+  { group: 'Praha 1', children: ['Staré Město', 'Malá Strana', 'Hradčany'] },
   { group: 'Praha 2', children: ['Nové Město', 'Vyšehrad', 'Vinohrady'] },
   { group: 'Praha 3', children: ['Žižkov', 'Vinohrady', 'Vysočany'] },
-  { group: 'Praha 4', children: ['Braník', 'Háje', 'Hodkovičky', 'Chodov', 'Kamýk', 'Komořany', 'Krč', 'Kunratice', 'Lhotka', 'Libuš', 'Michle', 'Modřany', 'Nusle', 'Písnice', 'Podolí', 'Šeberov', 'Točná', 'Záběhlice'] },
-  { group: 'Praha 5', children: ['Hlubočepy', 'Jinonice', 'Košíře', 'Motol', 'Radlice', 'Smíchov', 'Stodůlky', 'Zličín'] },
-  { group: 'Praha 6', children: ['Břevnov', 'Bubeneč', 'Dejvice', 'Liboc', 'Lysolaje', 'Nebušice', 'Ruzyně', 'Sedlec', 'Střešovice', 'Suchdol', 'Veleslavín', 'Vokovice'] },
+  { group: 'Praha 4', children: ['Braník', 'Háje', 'Chodov', 'Krč', 'Kunratice', 'Libuš', 'Michle', 'Nusle', 'Podolí', 'Šeberov', 'Záběhlice'] },
+  { group: 'Praha 5', children: ['Smíchov', 'Stodůlky', 'Zličín'] },
+  { group: 'Praha 6', children: ['Břevnov', 'Bubeneč', 'Dejvice', 'Lysolaje', 'Nebušice', 'Střešovice', 'Suchdol'] },
   { group: 'Praha 7', children: ['Bubeneč', 'Holešovice', 'Troja'] },
-  { group: 'Praha 8', children: ['Bohnice', 'Čimice', 'Karlín', 'Kobylisy', 'Libeň', 'Střížkov', 'Ďáblice'] },
-  { group: 'Praha 9', children: ['Hloubětín', 'Kyje', 'Letňany', 'Prosek', 'Střížkov', 'Vysočany'] },
-  { group: 'Praha 10', children: ['Hostivař', 'Malešice', 'Strašnice', 'Vršovice', 'Záběhlice'] },
+  { group: 'Praha 8', children: ['Karlín', 'Kobylisy', 'Libeň', 'Ďáblice'] },
+  { group: 'Praha 9', children: ['Hloubětín', 'Prosek', 'Vysočany'] },
+  { group: 'Praha 10', children: ['Malešice', 'Strašnice', 'Vršovice', 'Záběhlice'] },
   { group: 'Praha 11', children: ['Háje', 'Chodov', 'Křeslice'] },
-  { group: 'Praha 12', children: ['Komořany', 'Modřany', 'Písnice', 'Kamýk'] },
-  { group: 'Praha 13', children: ['Stodůlky', 'Jinonice'] },
-  { group: 'Praha 14', children: ['Černý Most', 'Hloubětín', 'Kyje', 'Hostavice'] },
-  { group: 'Praha 15', children: ['Hostivař', 'Petrovice', 'Štěrboholy', 'Horní Měcholupy', 'Dolní Měcholupy'] },
-  { group: 'Praha 16', children: ['Radotín', 'Lipence', 'Velká Chuchle', 'Lochkov', 'Zbraslav'] },
-  { group: 'Praha 17', children: ['Řepy'] },
-  { group: 'Praha 18', children: ['Letňany', 'Čakovice', 'Miškovice'] },
-  { group: 'Praha 19', children: ['Kbely', 'Satalice', 'Vinoř'] },
-  { group: 'Praha 20', children: ['Horní Počernice'] },
-  { group: 'Praha 21', children: ['Újezd nad Lesy', 'Klánovice', 'Koloděje'] },
-  { group: 'Praha 22', children: ['Uhříněves', 'Pitkovice', 'Hájek', 'Benice', 'Kolovraty', 'Královice', 'Nedvězí'] },
+  { group: 'Praha 12', children: [] },
+  { group: 'Praha 13', children: ['Stodůlky'] },
+  { group: 'Praha 14', children: ['Hloubětín'] },
+  { group: 'Praha 15', children: ['Petrovice', 'Štěrboholy', 'Dolní Měcholupy'] },
+  { group: 'Praha 16', children: ['Lipence', 'Velká Chuchle', 'Lochkov', 'Zbraslav'] },
+  { group: 'Praha 17', children: [] },
+  { group: 'Praha 18', children: ['Čakovice'] },
+  { group: 'Praha 19', children: ['Satalice', 'Vinoř'] },
+  { group: 'Praha 20', children: [] },
+  { group: 'Praha 21', children: ['Klánovice', 'Koloděje'] },
+  { group: 'Praha 22', children: ['Benice', 'Kolovraty', 'Nedvězí'] },
 ]
 
 // All unique district names flat (groups + children)
@@ -58,7 +58,7 @@ export function expandDistricts(selected: string[]): string[] {
 // The primary district selector is the chip grid below; suggestions are a bonus.
 export function suggestDistricts(address: string): string[] {
   if (!address || address.length < 3) return []
-  const lower = address.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+  const lower = address.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, )
   const suggestions: string[] = []
 
   const add = (name: string) => { if (!suggestions.includes(name)) suggestions.push(name) }
@@ -93,8 +93,7 @@ export function getParentGroup(district: string): string | null {
 }
 
 // ── District polygon boundaries ──
-// Imported from ./district_polygons (generated from OSM Overpass API for Praha 1–15,
-// hand-approximated for sub-districts)
+// All real OSM boundaries from IPR Praha + datasets/export.geojson.
 export { DISTRICT_POLYGONS } from './district_polygons'
 
 // Ray-casting point-in-polygon check

@@ -6,6 +6,8 @@ import { Map } from '../components/Map'
 import { FilterPanel } from '../components/FilterPanel'
 import { expandDistricts } from '../lib/districts'
 import { convexHull, expandHull, pointInConvexPolygon } from '../lib/isochrone'
+import { Footer } from '../components/Footer'
+import { useLang } from '../lib/lang'
 
 type BBox = { west: number; south: number; east: number; north: number }
 const STATUS_RANK = { green: 0, yellow: 1, red: 2, grey: 3 } as const
@@ -20,9 +22,15 @@ interface Props {
   showMap: boolean
   onToggleMap: () => void
   onListingClick: (id: string) => void
+  isMobile?: boolean
+  isochroneAutoShowMap?: () => void
+  user?: any | null
+  favoriteIds?: Set<string>
+  onToggleFavorite?: (id: string) => void
 }
 
-export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingClick }: Props) {
+export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingClick, isMobile, isochroneAutoShowMap, user, favoriteIds, onToggleFavorite }: Props) {
+  const { t } = useLang()
   const [listings, setListings] = useState<ListingSearchResult[]>([])
   const [loading, setLoading] = useState(false)
   const [highlightedId, setHighlightedId] = useState<string | null>(null)
@@ -263,6 +271,8 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
     if (!isoModeActive) return
     setIsoModeActive(false)  // deactivate after one click so markers work again
     setIsoCenter({ lat, lng })
+    // On mobile, auto-show map so user sees the isochrone polygon
+    if (isMobile && isochroneAutoShowMap) isochroneAutoShowMap()
     scheduleIsochrone(lat, lng, isoMinutes)
   }, [isoModeActive, isoMinutes, scheduleIsochrone])
   // ── Apply isochrone polygon filter if active ──
@@ -285,8 +295,25 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
   return (
     <div style={{ display: 'flex', flex: 1, overflow: 'hidden', height: '100%' }}>
 
-      {showMap && (
-        <div style={{ flex: 1, position: 'relative', minWidth: 0 }}>
+      {/* ── Map (desktop: side panel, mobile: full-height layer) ── */}
+      <div style={{
+        flex: isMobile ? undefined : 1,
+        position: isMobile ? 'absolute' : 'relative',
+        inset: isMobile ? 0 : undefined,
+        zIndex: isMobile ? 10 : undefined,
+        minWidth: isMobile ? '100%' : 0,
+        overflow: 'hidden',
+        // Slide + fade animation
+        transform: showMap ? 'translateX(0)' : (isMobile ? 'translateX(0)' : 'translateX(-30px)'),
+        opacity: showMap ? 1 : 0,
+        pointerEvents: showMap ? 'auto' : 'none',
+        transition: 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease',
+      }}>
+        <div style={{
+          width: '100%', height: '100%',
+          // Prevent internal re-render issues — always mount the Map
+          visibility: showMap ? 'visible' : 'hidden',
+        }}>
           <Map
             listings={listingsFilteredByIso.filter(l => l.lat !== 0)}
             highlightedId={highlightedId}
@@ -294,22 +321,44 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
             onBoundsChange={setBbox}
             activeLines={filters.transitLines}
             activeDistricts={filters.districts}
-            isochronePolygon={isoPolygon}
-            isochroneCenter={isoCenter}
+            isochronePolygon={showMap ? isoPolygon : null}
+            isochroneCenter={showMap ? isoCenter : null}
             onIsochroneClick={handleIsochroneMapClick}
+            t={t}
           />
+        </div>
+      </div>
+
+      {/* Mobile map overlay button — always above the map */}
+      {isMobile && showMap && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 20,
+          pointerEvents: 'none',
+        }}>
+          <button onClick={onToggleMap}
+            style={{
+              position: 'absolute', top: 8, left: 8,
+              padding: '6px 12px', borderRadius: 8, cursor: 'pointer',
+              background: 'var(--c-surface)', color: 'var(--c-text)',
+              border: '1px solid var(--c-border)', fontSize: 12, fontWeight: 500,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+              pointerEvents: 'auto',
+            }}>
+            {t('mobile_list_btn_back')}
+          </button>
         </div>
       )}
 
       <div style={{
-        width: showMap ? '50%' : '100%',
+        width: isMobile ? '100%' : (showMap ? '50%' : '100%'),
         display: 'flex', flexDirection: 'column',
-        borderLeft: showMap ? '1px solid var(--c-border)' : 'none',
+        borderLeft: (!isMobile && showMap) ? '1px solid var(--c-border)' : 'none',
         background: 'var(--c-bg)', overflow: 'hidden', flexShrink: 0,
+        zIndex: isMobile && showMap ? 5 : undefined,
       }}>
         <FilterPanel filters={filters} onChange={onChange} resultCount={listings.length} loading={loading} />
 
-        {/* Isochrone control bar */}
+        {/* ── Toolbar: isochrone + sort + toggle map ── */}
         <div style={{
           padding: '8px 12px', borderBottom: '1px solid var(--c-border)',
           background: 'var(--c-surface)', flexShrink: 0,
@@ -335,14 +384,14 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
                   borderRadius: 4, fontSize: 12, color: 'var(--c-text)', background: 'white',
                   outline: 'none', textAlign: 'center',
                 }} />
-              <span style={{ fontSize: 11, color: 'var(--c-muted)' }}>min</span>
-              {isoLoading && <span style={{ fontSize: 10, color: 'var(--c-faint)' }}>⏳</span>}
+              <span style={{ fontSize: 11, color: 'var(--c-muted)' }}>{t('iso_minutes')}</span>
+              {isoLoading && <span style={{ fontSize: 10, color: 'var(--c-faint)' }}>{t('iso_loading')}</span>}
               <button onClick={() => { setIsoCenter(null); setIsoPolygon(null) }}
                 style={{
                   padding: '2px 7px', border: '1px solid var(--c-border)', borderRadius: 4,
                   background: 'transparent', fontSize: 10, color: 'var(--c-muted)', cursor: 'pointer',
                 }}>
-                ✕ Zrušit
+                {t('iso_cancel')}
               </button>
             </>
           ) : (
@@ -356,16 +405,16 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
                   fontSize: 11, fontWeight: isoModeActive ? 600 : 400,
                   whiteSpace: 'nowrap',
                 }}>
-                📍 Dojezd PID (MHD)
+                {t('iso_label')}
               </button>
               {!isoModeActive &&
-                <span style={{ fontSize: 10, color: '#000', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
-                  reálný dosah z libovolného místa pomocí dopravy PID
+                <span style={{ fontSize: 10, color: 'var(--c)', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+                  {t('iso_description')}
                 </span>
               }
               {isoModeActive &&
                 <span style={{ fontSize: 10, color: '#2563eb', fontWeight: 500, whiteSpace: 'nowrap' }}>
-                  klikni na mapu pro výpočet
+                  {t('iso_active')}
                 </span>
               }
             </div>
@@ -378,9 +427,9 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
                 padding: '2px 6px', border: '1px solid var(--c-border)', borderRadius: 4,
                 fontSize: 10, color: 'var(--c-muted)', background: 'white', outline: 'none',
               }}>
-              <option value="date">Datum</option>
-              <option value="price">Cena</option>
-              <option value="area">Plocha</option>
+              <option value="date">{t('sort_date')}</option>
+              <option value="price">{t('sort_price')}</option>
+              <option value="area">{t('sort_area')}</option>
             </select>
             <button onClick={() => onChange({ ...filters, sortDir: filters.sortDir === 'desc' ? 'asc' : 'desc' })}
               style={{
@@ -394,9 +443,11 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
 
           <button onClick={onToggleMap} style={{
             padding: '4px 10px', border: '1px solid var(--c-border)', borderRadius: 6,
-            background: 'transparent', fontSize: 11, color: 'var(--c-muted)', cursor: 'pointer',
+            background: showMap && isMobile ? 'var(--c-accent)' : 'transparent',
+            color: showMap && isMobile ? 'white' : 'var(--c-muted)',
+            fontSize: 11, cursor: 'pointer',
           }}>
-            {showMap ? '🗺 Skrýt mapu' : '🗺 Zobrazit mapu'}
+            {isMobile ? (showMap ? t('mobile_list_btn') : t('mobile_map_btn')) : (showMap ? t('map_toggle_hide') : t('map_toggle_show'))}
           </button>
         </div>
 
@@ -412,8 +463,8 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
           {!loading && listings.length === 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 200, gap: 8 }}>
               <span style={{ fontSize: 32 }}>🔍</span>
-              <span style={{ fontSize: 13, color: 'var(--c-muted)' }}>Žádné inzeráty</span>
-              <span style={{ fontSize: 11, color: 'var(--c-faint)' }}>Zkus upravit filtry</span>
+              <span style={{ fontSize: 13, color: 'var(--c-muted)' }}>{t('no_results')}</span>
+              <span style={{ fontSize: 11, color: 'var(--c-faint)' }}>{t('no_results_hint')}</span>
             </div>
           )}
 
@@ -438,14 +489,14 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
 
                 const sections: { key: TransitStatus; color: string; label: string }[] = []
                 if (hasBoth) {
-                  sections.push({ key: 'green', color: '#16a34a', label: '● V obou oblastech' })
-                  sections.push({ key: 'yellow', color: '#ca8a04', label: '● Jen v městské části' })
-                  sections.push({ key: 'red', color: '#dc2626', label: '● Jen na trase linek' })
+                  sections.push({ key: 'green', color: '#16a34a', label: '● ' + t('green') })
+                  sections.push({ key: 'yellow', color: '#ca8a04', label: '● ' + t('yellow') })
+                  sections.push({ key: 'red', color: '#dc2626', label: '● ' + t('red') })
                 } else if (hasTransitOnly) {
-                  sections.push({ key: 'green', color: '#16a34a', label: '● V dosahu linky' })
-                  sections.push({ key: 'yellow', color: '#ca8a04', label: '● Dále od linky' })
+                  sections.push({ key: 'green', color: '#16a34a', label: '● ' + t('green_transit_only') })
+                  sections.push({ key: 'yellow', color: '#ca8a04', label: '● ' + t('yellow_transit_only') })
                 } else if (hasDistOnly) {
-                  sections.push({ key: 'yellow', color: '#ca8a04', label: '● V městské části' })
+                  sections.push({ key: 'yellow', color: '#ca8a04', label: '● ' + t('yellow_dist_only') })
                 }
 
                 return sections.map(s => (
@@ -489,6 +540,7 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
               )}
             </div>
           )}
+          {!isMobile && <Footer />}
         </div>
       </div>
     </div>
