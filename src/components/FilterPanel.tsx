@@ -15,6 +15,7 @@ interface Props {
   onChange: (f: SearchFilters) => void
   resultCount: number
   loading: boolean
+  isMobile?: boolean
 }
 
 function toggle<T>(arr: T[], val: T): T[] {
@@ -53,7 +54,7 @@ function Section({ label, hint, children }: { label: string; hint?: string; chil
   )
 }
 
-export function FilterPanel({ filters, onChange, resultCount, loading }: Props) {
+export function FilterPanel({ filters, onChange, resultCount, loading, isMobile }: Props) {
   const [expanded, setExpanded] = useState(false)
   const set = (p: Partial<SearchFilters>) => onChange({ ...filters, ...p })
   const activeCount = activeFilterCount(filters)
@@ -94,13 +95,15 @@ export function FilterPanel({ filters, onChange, resultCount, loading }: Props) 
       </div>
 
       <div style={{
-        overflow: 'hidden',
-        maxHeight: expanded ? '60vh' : '0',
-        opacity: expanded ? 1 : 0,
-        transition: 'max-height 0.35s ease, opacity 0.25s ease',
-        pointerEvents: expanded ? 'auto' : 'none',
+        display: 'grid',
+        gridTemplateRows: expanded ? '1fr' : '0fr',
+        transition: 'grid-template-rows 0.35s ease',
       }}>
-        <div style={{ padding: expanded ? '0 12px 14px' : '0 12px', display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto' }}>
+        <div style={{
+          overflow: 'hidden',
+          minHeight: 0,
+        }}>
+          <div style={{ padding: expanded ? '0 12px 14px' : '0 12px', display: 'flex', flexDirection: 'column', gap: 14, maxHeight: isMobile ? '30vh' : '35vh', overflowY: 'auto' }}>
 
           {/* Toggle switch for map-area filtering — always visible at top */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0' }}>
@@ -196,6 +199,7 @@ export function FilterPanel({ filters, onChange, resultCount, loading }: Props) 
             </button>
           )}
         </div>
+      </div>
       </div>
     </div>
   )

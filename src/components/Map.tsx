@@ -68,6 +68,8 @@ export function Map({ listings, highlightedId, onMarkerClick, onBoundsChange, ac
   const activeLayerIds = useRef<string[]>([])
   const onIsochroneClickRef = useRef(onIsochroneClick)
   onIsochroneClickRef.current = onIsochroneClick
+  const onMarkerClickRef = useRef(onMarkerClick)
+  onMarkerClickRef.current = onMarkerClick
 
   const removeOverlays = useCallback((map: maplibregl.Map) => {
     activeLayerIds.current.forEach(id => {
@@ -226,7 +228,7 @@ export function Map({ listings, highlightedId, onMarkerClick, onBoundsChange, ac
       inner.style.cssText = `width:28px;height:28px;border-radius:50%;background:${COLORS[l.transit_status]};border:2.5px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.22);transition:transform 0.13s;`
       el.appendChild(inner)
 
-      el.addEventListener('click', () => onMarkerClick(l.listing_id))
+      el.addEventListener('click', () => onMarkerClickRef.current(l.listing_id))
       el.addEventListener('mouseenter', () => { inner.style.transform = 'scale(1.2)' })
       el.addEventListener('mouseleave', () => { inner.style.transform = 'scale(1)' })
 
@@ -237,7 +239,7 @@ export function Map({ listings, highlightedId, onMarkerClick, onBoundsChange, ac
         .addTo(map)
       markersRef.current.set(l.listing_id, marker)
     })
-  }, [listings, onMarkerClick])
+  }, [listings])
 
   useEffect(() => {
     markersRef.current.forEach((m, id) => {

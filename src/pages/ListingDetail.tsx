@@ -5,11 +5,13 @@ import { PROPERTY_TYPE_LABELS } from '../lib/types'
 import { formatPrice, formatDate, getImageUrl } from '../lib/utils'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import { useLang } from '../lib/lang'
 
 const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY
 
 // ── Mini map showing the listing's location ──
 function MiniMap({ lat, lng, title }: { lat: number; lng: number; title: string }) {
+  const { t } = useLang()
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -29,7 +31,7 @@ function MiniMap({ lat, lng, title }: { lat: number; lng: number; title: string 
 
   return (
     <div style={{ marginBottom: 20 }}>
-      <h3 style={{ fontSize: 12, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 8px' }}>Poloha na mapě</h3>
+      <h3 style={{ fontSize: 12, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 8px' }}>{t('_detail_location')}</h3>
       <div ref={ref} style={{ width: '100%', height: 200, borderRadius: 10, overflow: 'hidden', border: '1px solid #e2e8f0' }} />
     </div>
   )
@@ -56,6 +58,7 @@ interface Props {
 }
 
 export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUser, isFavorited, onToggleFavorite }: Props) {
+  const { t } = useLang()
   const [listing, setListing] = useState<FullListing | null>(null)
   const [loading, setLoading] = useState(true)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
@@ -107,19 +110,26 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
   }, [onClose])
 
   const amenities = listing ? [
-    listing.furnished    && 'Zařízený',
-    listing.pets_allowed && 'Zvířata OK',
-    listing.parking      && 'Parkování',
-    listing.balcony      && 'Balkon',
-    listing.cellar       && 'Sklep',
+    listing.furnished    && t('amenities_furnished'),
+    listing.pets_allowed && t('amenities_pets'),
+    listing.parking      && t('amenities_parking'),
+    listing.balcony      && t('amenities_balcony'),
+    listing.cellar       && t('amenities_cellar'),
   ].filter(Boolean) : []
 
   return (
     <div
-      style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60, padding: 20 }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60, padding: window.innerWidth < 768 ? 0 : 20 }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div style={{ width: '80%', maxWidth: 900, height: '85vh', background: 'white', borderRadius: 16, display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 24px 64px rgba(0,0,0,0.35)', position: 'relative' }}>
+      <div style={{
+        width: 'min(80%, 900px)',
+        height: '85vh', maxHeight: window.innerWidth < 768 ? '100dvh' : '85vh',
+        background: 'white', borderRadius: window.innerWidth < 768 ? 0 : 16,
+        display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        boxShadow: window.innerWidth < 768 ? 'none' : '0 24px 64px rgba(0,0,0,0.35)',
+        position: 'relative',
+      }}>
 
         {/* Favorite star */}
         {onToggleFavorite && propUser && (
@@ -143,7 +153,7 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
         {loading && (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
             <div style={{ width: 28, height: 28, borderRadius: '50%', border: '2.5px solid #2563eb', borderTopColor: 'transparent', animation: 'spin 0.7s linear infinite' }} />
-            <span style={{ fontSize: 12, color: '#94a3b8' }}>Načítám inzerát...</span>
+            <span style={{ fontSize: 12, color: '#94a3b8' }}>{t('_detail_loading')}</span>
           </div>
         )}
 
@@ -151,7 +161,7 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32 }}>
             <span style={{ fontSize: 40 }}>😕</span>
             <p style={{ color: '#64748b', fontSize: 14, textAlign: 'center', maxWidth: 280 }}>{errorMsg}</p>
-            <button onClick={onClose} style={{ padding: '8px 20px', border: '1px solid #e2e8f0', borderRadius: 8, background: 'white', cursor: 'pointer', fontSize: 13 }}>Zavřít</button>
+            <button onClick={onClose} style={{ padding: '8px 20px', border: '1px solid var(--c-border)', borderRadius: 8, background: 'var(--c-surface)', cursor: 'pointer', fontSize: 13, color: 'var(--c-text)' }}>{t('_detail_close')}</button>
           </div>
         )}
 
@@ -191,7 +201,7 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
             </div>
 
             {/* Body */}
-            <div style={{ padding: '24px 28px', display: 'flex', gap: 28 }}>
+            <div style={{ padding: window.innerWidth < 768 ? '16px' : '24px 28px', display: 'flex', flexDirection: window.innerWidth < 768 ? 'column' : 'row', gap: 28 }}>
 
               {/* Left */}
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -214,12 +224,12 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
                 {/* Stats */}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20, padding: '14px 0', borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0', marginBottom: 20 }}>
                   {([
-                    ['Dispozice', PROPERTY_TYPE_LABELS[listing.property_type]],
-                    ['Plocha', `${listing.area_sqm} m²`],
-                    listing.floor != null ? ['Patro', `${listing.floor}. patro`] : null,
-                    ['Dostupné od', formatDate(listing.available_from)],
-                    ['Min. nájem', `${listing.min_lease_months} měs.`],
-                    listing.deposit_czk ? ['Kauce', `${listing.deposit_czk.toLocaleString('cs-CZ')} Kč`] : null,
+                    [t('_detail_floorplan'), PROPERTY_TYPE_LABELS[listing.property_type]],
+                    [t('_detail_area'), `${listing.area_sqm} m²`],
+                    listing.floor != null ? [t('_detail_floor'), `${listing.floor}${t('_detail_floor_prefix')}`] : null,
+                    [t('_detail_available'), formatDate(listing.available_from)],
+                    [t('_detail_min_lease'), `${listing.min_lease_months} ${t('_detail_month')}`],
+                    listing.deposit_czk ? [t('_detail_deposit'), `${listing.deposit_czk.toLocaleString('cs-CZ')} Kč`] : null,
                   ] as ([string,string]|null)[])
                     .filter((x): x is [string,string] => x !== null)
                     .map(([k, v]) => (
@@ -241,7 +251,7 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
 
                 {/* Description */}
                 <div style={{ marginBottom: 20 }}>
-                  <h3 style={{ fontSize: 12, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 8px' }}>Popis</h3>
+                  <h3 style={{ fontSize: 12, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 8px' }}>{t('_detail_description')}</h3>
                   <p style={{ fontSize: 14, lineHeight: 1.7, whiteSpace: 'pre-wrap', color: '#0f172a', margin: 0 }}>{listing.description}</p>
                 </div>
 
@@ -289,7 +299,7 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
               </div>
 
               {/* Right — contact */}
-              <div style={{ width: 220, flexShrink: 0 }}>
+              <div style={{ width: window.innerWidth < 768 ? '100%' : 220, flexShrink: 0 }}>
                 <div style={{ border: '1px solid #e2e8f0', borderRadius: 12, padding: 16, position: 'sticky', top: 0 }}>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
@@ -299,8 +309,8 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
                         : <span style={{ fontSize: 20 }}>👤</span>}
                     </div>
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{listing.owner?.display_name ?? 'Majitel'}</div>
-                      <div style={{ fontSize: 11, color: '#64748b' }}>Soukromá osoba</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--c-text)' }}>{listing.owner?.display_name ?? t('_detail_owner')}</div>
+                      <div style={{ fontSize: 11, color: 'var(--c-muted)' }}>{t('_detail_private')}</div>
                     </div>
                   </div>
 
@@ -310,34 +320,34 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
                         {listing.owner?.phone ? (
                           <a href={`tel:${listing.owner.phone}`} style={{ fontWeight: 600 }}>{listing.owner.phone}</a>
                         ) : (
-                          <span style={{ color: 'var(--c-muted)', fontSize: 13 }}>Majitel neuvedl telefon</span>
+                          <span style={{ color: 'var(--c-muted)', fontSize: 13 }}>{t('_detail_no_phone')}</span>
                         )}
                         {listing.owner?.email && (
-                          <a href={`mailto:${listing.owner.email}`} style={{ fontSize: 13, color: '#2563eb' }}>{listing.owner.email}</a>
+                          <a href={`mailto:${listing.owner.email}`} style={{ fontSize: 13, color: '#2563eb', wordBreak: 'break-all' }}>{listing.owner.email}</a>
                         )}
-                        <p style={{ fontSize: 11, color: 'var(--c-muted)' }}>Kontaktuj přímo — žádná provize</p>
+                        <p style={{ fontSize: 11, color: 'var(--c-muted)' }}>{t('_detail_contact_note')}</p>
                       </div>
                     ) : (
                       <button onClick={() => setShowContact(true)} style={{ width: '100%', padding: '11px 0', background: '#16a34a', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-                        📞 Zobrazit kontakt
+                        {t('_detail_contact_btn')}
                       </button>
                     )
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      <p style={{ fontSize: 12, color: '#64748b', lineHeight: 1.5, textAlign: 'center', margin: 0 }}>
-                        Pro zobrazení kontaktu se přihlas zdarma
+                      <p style={{ fontSize: 12, color: 'var(--c-muted)', lineHeight: 1.5, textAlign: 'center', margin: 0 }}>
+                        {t('_detail_login_prompt')}
                       </p>
                       <button
                         onClick={() => { onClose(); onRequestAuth?.() }}
-                        style={{ width: '100%', padding: '10px 0', background: '#0f172a', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
+                        style={{ width: '100%', padding: '10px 0', background: 'var(--c-text)', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
                       >
-                        Přihlásit se
+                        {t('_detail_login_btn')}
                       </button>
                     </div>
                   )}
 
                   <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid #e2e8f0', fontSize: 11, color: '#94a3b8', lineHeight: 1.6 }}>
-                    Přidáno {formatDate(listing.created_at)}
+                    {t('_detail_added')} {formatDate(listing.created_at)}
                   </div>
                 </div>
               </div>

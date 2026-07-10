@@ -296,24 +296,19 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
     <div style={{ display: 'flex', flex: 1, overflow: 'hidden', height: '100%' }}>
 
       {/* ── Map (desktop: side panel, mobile: full-height layer) ── */}
+      {(!isMobile || showMap) && (
       <div style={{
         flex: isMobile ? undefined : 1,
         position: isMobile ? 'absolute' : 'relative',
         inset: isMobile ? 0 : undefined,
         zIndex: isMobile ? 10 : undefined,
         minWidth: isMobile ? '100%' : 0,
+        maxWidth: isMobile ? '100%' : (showMap ? '50%' : '0%'),
         overflow: 'hidden',
-        // Slide + fade animation
-        transform: showMap ? 'translateX(0)' : (isMobile ? 'translateX(0)' : 'translateX(-30px)'),
-        opacity: showMap ? 1 : 0,
-        pointerEvents: showMap ? 'auto' : 'none',
-        transition: 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease',
+        opacity: isMobile ? 1 : (showMap ? 1 : 0),
+        transition: 'max-width 0.3s ease, opacity 0.2s ease',
       }}>
-        <div style={{
-          width: '100%', height: '100%',
-          // Prevent internal re-render issues — always mount the Map
-          visibility: showMap ? 'visible' : 'hidden',
-        }}>
+        {(!isMobile || showMap) && (
           <Map
             listings={listingsFilteredByIso.filter(l => l.lat !== 0)}
             highlightedId={highlightedId}
@@ -321,13 +316,14 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
             onBoundsChange={setBbox}
             activeLines={filters.transitLines}
             activeDistricts={filters.districts}
-            isochronePolygon={showMap ? isoPolygon : null}
-            isochroneCenter={showMap ? isoCenter : null}
+            isochronePolygon={isoPolygon}
+            isochroneCenter={isoCenter}
             onIsochroneClick={handleIsochroneMapClick}
             t={t}
           />
-        </div>
+        )}
       </div>
+      )}
 
       {/* Mobile map overlay button — always above the map */}
       {isMobile && showMap && (
@@ -356,7 +352,7 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
         background: 'var(--c-bg)', overflow: 'hidden', flexShrink: 0,
         zIndex: isMobile && showMap ? 5 : undefined,
       }}>
-        <FilterPanel filters={filters} onChange={onChange} resultCount={listings.length} loading={loading} />
+        <FilterPanel filters={filters} onChange={onChange} resultCount={listings.length} loading={loading} isMobile={isMobile} />
 
         {/* ── Toolbar: isochrone + sort + toggle map ── */}
         <div style={{
@@ -540,7 +536,7 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
               )}
             </div>
           )}
-          {!isMobile && <Footer />}
+          <Footer />
         </div>
       </div>
     </div>

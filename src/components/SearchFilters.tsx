@@ -133,9 +133,9 @@ export function FilterPanel({ filters, onChange, resultCount, loading }: SearchF
         <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Vybavení</label>
         <div className="flex flex-col gap-2">
           {[
-            { key: 'furnished', label: '🛋️ Zařízený' },
-            { key: 'petsAllowed', label: '🐾 Zvířata povolena' },
-            { key: 'parking', label: '🅿️ Parkování' },
+            { key: 'furnished', label: 'Zařízený' },
+            { key: 'petsAllowed', label: 'Zvířata povolena' },
+            { key: 'parking', label: 'Parkování' },
           ].map(({ key, label }) => (
             <label key={key} className="flex items-center gap-2 cursor-pointer">
               <input
