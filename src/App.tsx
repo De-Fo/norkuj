@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
 import { SearchPage } from './pages/Search'
@@ -14,6 +14,8 @@ import { MyListingsPage } from './pages/MyListings'
 import type { Listing } from './lib/types'
 import { useLang } from './lib/lang'
 import { CookieConsent } from './components/CookieConsent'
+import { FeatureTour, isFirstVisit, markTourSeen } from './components/FeatureTour'
+import { getImageUrl } from './lib/utils'
 
 const ADMIN_UIDS = (import.meta.env.VITE_ADMIN_UIDS ?? '').split(',').map((s: string) => s.trim()).filter(Boolean)
 
@@ -23,10 +25,20 @@ type Route = 'search' | 'auth' | 'profile' | 'my-listings' | 'favorites'
 function getInitialTheme(): Theme {
   const stored = localStorage.getItem('norkuj-theme')
   if (stored === 'dark' || stored === 'light') return stored
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  return 'light'
 }
 
 export default function App() {
+  // ── Parse direct /listing/{id} URL on mount ──
+  const listingUrlRef = useRef(false)  // true when openListing() called pushState
+
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+  const parseListingIdFromPath = (): string | null => {
+    const m = window.location.pathname.match(/^\/listing\/([^/]+)$/i)
+    return m && UUID_RE.test(m[1]) ? m[1] : null
+  }
+
   const [user, setUser] = useState<User | null>(null)
   const [route, setRoute] = useState<Route>('search')
   const [authLoading, setAuthLoading] = useState(true)
@@ -34,11 +46,12 @@ export default function App() {
   const [showMap, setShowMap] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [showAdmin, setShowAdmin] = useState(false)
-  const [selectedListingId, setSelectedListingId] = useState<string | null>(null)
+  const [selectedListingId, setSelectedListingId] = useState<string | null>(parseListingIdFromPath)
   const [editingListing, setEditingListing] = useState<Listing | null>(null)
   const [theme, setTheme] = useState<Theme>(getInitialTheme)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
   const [favoritesIds, setFavoritesIds] = useState<Set<string>>(new Set())
+  const [tourOpen, setTourOpen] = useState(false)
   const { t, lang, setLang } = useLang()
 
   // ── Theme ──
@@ -48,6 +61,52 @@ export default function App() {
   }, [theme])
 
   const toggleTheme = () => setTheme(t => t === 'light' ? 'dark' : 'light')
+
+  // ── Listing URL routing ──
+  const openListing = useCallback((id: string) => {
+    setSelectedListingId(id)
+    listingUrlRef.current = true
+    window.history.pushState({ listingId: id }, '', `/listing/${id}`)
+  }, [])
+
+  const closeListing = useCallback(() => {
+    if (listingUrlRef.current) {
+      listingUrlRef.current = false
+      // history.back() triggers popstate which clears selectedListingId
+      window.history.back()
+    } else {
+      // Direct load or refresh at /listing/{id} — replace URL silently
+      if (parseListingIdFromPath()) {
+        window.history.replaceState(null, '', '/')
+      }
+      setSelectedListingId(null)
+    }
+  }, [])
+
+  // Popstate: user pressed back/forward — sync listing modal with URL
+  useEffect(() => {
+    const onPop = () => {
+      const id = parseListingIdFromPath()
+      if (id) {
+        setSelectedListingId(id)
+        listingUrlRef.current = true
+      } else {
+        setSelectedListingId(null)
+        listingUrlRef.current = false
+      }
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
+
+  // If loaded directly at /listing/{id}, leave listingUrlRef false so
+  // closeListing uses replaceState instead of history.back() (which would
+  // navigate away entirely on a direct-load page)
+  useEffect(() => {
+    if (selectedListingId && parseListingIdFromPath()) {
+      listingUrlRef.current = false
+    }
+  }, [selectedListingId])
 
   // ── Mobile detection ──
   useEffect(() => {
@@ -72,6 +131,14 @@ export default function App() {
       if (session) setRoute('search')
     })
     return () => subscription.unsubscribe()
+  }, [])
+
+  // ── First-visit tour check ──
+  useEffect(() => {
+    if (isFirstVisit()) {
+      setTourOpen(true)
+      markTourSeen()
+    }
   }, [])
 
   // ── Favorites ──
@@ -128,7 +195,7 @@ export default function App() {
         display: 'flex', alignItems: 'center', padding: '0 16px', justifyContent: 'space-between',
         transition: 'background 0.2s',
       }}>
-        <button onClick={() => setRoute('search')}
+        <button onClick={() => { setRoute('search'); setShowMap(true); setShowCreate(false); setSelectedListingId(null); setShowAdmin(false) }}
           style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
           <Wordmark size="md" />
         </button>
@@ -215,6 +282,18 @@ export default function App() {
             </>
           )}
 
+          {/* Help / How it works */}
+          <button onClick={() => setTourOpen(true)}
+            title={t('_tour_title')}
+            style={{
+              minWidth: 32, height: 32, padding: 0, background: 'transparent',
+              border: '1px solid var(--c-border)', borderRadius: 7, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 14, lineHeight: 1, color: 'var(--c-muted)',
+            }}>
+            ❓
+          </button>
+
           {/* Lang switcher — far right */}
           <select value={lang} onChange={e => setLang(e.target.value as 'cz' | 'en')}
             style={{
@@ -233,7 +312,8 @@ export default function App() {
         {route === 'favorites' ? (
           <FavoritesPage
             listingIds={Array.from(favoritesIds)}
-            onListingClick={id => { setSelectedListingId(id); setRoute('search') }}
+            onSelectListing={openListing}
+            onBack={() => setRoute('search')}
           />
         ) : (
           <SearchPage
@@ -241,7 +321,7 @@ export default function App() {
             onChange={setFilters}
             showMap={showMap}
             onToggleMap={() => setShowMap(v => !v)}
-            onListingClick={id => setSelectedListingId(id)}
+            onListingClick={openListing}
             isMobile={isMobile}
             isochroneAutoShowMap={() => { if (isMobile) setShowMap(true) }}
           />
@@ -259,7 +339,7 @@ export default function App() {
       {selectedListingId && (
         <ListingDetail
           listingId={selectedListingId}
-          onClose={() => setSelectedListingId(null)}
+          onClose={closeListing}
           onRequestAuth={() => setRoute('auth')}
           user={user}
           isFavorited={favoritesIds.has(selectedListingId)}
@@ -274,11 +354,16 @@ export default function App() {
       {/* ═══ Cookie consent ═══ */}
       <CookieConsent />
 
+      {/* ═══ Feature tour ═══ */}
+      <FeatureTour open={tourOpen} onClose={() => setTourOpen(false)} />
+
       {/* ═══ GLOBAL STYLES ═══ */}
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes slideDown { from { opacity: 0; max-height: 0 } to { opacity: 1; max-height: 60vh } }
         @keyframes slideUp { from { opacity: 1; max-height: 60vh } to { opacity: 0; max-height: 0 } }
+        @keyframes pulse-iso { 0%, 100% { opacity: 0.35; transform: scale(1); } 50% { opacity: 1; transform: scale(1.4); } }
+        @keyframes pulse-map { 0%, 100% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--c-accent) 30%, transparent); } 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--c-accent) 50%, transparent); } }
 
         :root,
         [data-theme="light"] {
@@ -354,12 +439,14 @@ export default function App() {
 }
 
 // ═══ Favorites page ═══
-function FavoritesPage({ listingIds, onListingClick }: {
+function FavoritesPage({ listingIds, onSelectListing, onBack }: {
   listingIds: string[]
-  onListingClick: (id: string) => void
+  onSelectListing: (id: string) => void
+  onBack: () => void
 }) {
   const [listings, setListings] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const { t } = useLang()
 
   useEffect(() => {
     if (listingIds.length === 0) { setListings([]); setLoading(false); return }
@@ -374,28 +461,53 @@ function FavoritesPage({ listingIds, onListingClick }: {
 
   return (
     <div style={{ flex: 1, overflow: 'auto', padding: 16 }}>
-      <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 16px', color: 'var(--c-text)' }}>
-        ⭐️ Oblíbené inzeráty
-      </h2>
-      {loading && <p style={{ color: 'var(--c-muted)', fontSize: 13 }}>Načítám...</p>}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: 'var(--c-text)' }}>
+          ⭐️ {t('favorites_title')}
+        </h2>
+        <button onClick={onBack}
+          style={{
+            padding: '6px 14px', border: '1px solid var(--c-border)', borderRadius: 8,
+            background: 'var(--c-surface)', color: 'var(--c-text)',
+            fontSize: 12, cursor: 'pointer',
+          }}>
+          {t('favorites_back')}
+        </button>
+      </div>
+      {loading && <p style={{ color: 'var(--c-muted)', fontSize: 13 }}>{t('loading')}</p>}
       {!loading && listings.length === 0 && (
-        <p style={{ color: 'var(--c-faint)', fontSize: 13 }}>Zatím nemáš žádné oblíbené inzeráty.</p>
+        <p style={{ color: 'var(--c-faint)', fontSize: 13 }}>{t('favorites_empty')}</p>
       )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {listings.map((l: any) => (
-          <div key={l.id} onClick={() => onListingClick(l.id)}
+          <div key={l.id} onClick={() => onSelectListing(l.id)}
             style={{
-              padding: '12px 14px', background: 'var(--c-surface)', borderRadius: 10,
+              padding: '10px 14px', background: 'var(--c-surface)', borderRadius: 10,
               border: '1px solid var(--c-border)', cursor: 'pointer',
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              display: 'flex', alignItems: 'center', gap: 12,
             }}>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--c-text)' }}>{l.title}</div>
+            {/* Thumbnail */}
+            <div style={{
+              width: 52, height: 52, borderRadius: 8, flexShrink: 0,
+              overflow: 'hidden', background: 'var(--c-bg)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              {l.image_paths?.[0] ? (
+                <img src={getImageUrl(l.image_paths[0])} alt={l.title}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  onError={e => { (e.target as HTMLElement).style.display = 'none' }}
+                />
+              ) : (
+                <span style={{ fontSize: 20, opacity: 0.3 }}>🏠</span>
+              )}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--c-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.title}</div>
               <div style={{ fontSize: 11, color: 'var(--c-muted)', marginTop: 2 }}>
                 {l.address_district} · {l.area_sqm} m²
               </div>
             </div>
-            <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--c-accent)', whiteSpace: 'nowrap' }}>
+            <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--c-accent)', whiteSpace: 'nowrap', flexShrink: 0 }}>
               {l.price_total_czk.toLocaleString('cs-CZ')} Kč
             </div>
           </div>

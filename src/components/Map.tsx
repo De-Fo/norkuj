@@ -73,10 +73,11 @@ export function Map({ listings, highlightedId, onMarkerClick, onBoundsChange, ac
   onMarkerClickRef.current = onMarkerClick
 
   const removeOverlays = useCallback((map: maplibregl.Map) => {
-    activeLayerIds.current.forEach(id => {
-      if (map.getLayer(id)) map.removeLayer(id)
-      if (map.getSource(id)) map.removeSource(id)
-    })
+    const ids = activeLayerIds.current
+    // Two-pass: remove all layers first, then all sources — avoids errors when
+    // a source is still referenced by a layer that hasn't been removed yet.
+    ids.forEach(id => { if (map.getLayer(id)) map.removeLayer(id) })
+    ids.forEach(id => { if (map.getSource(id)) map.removeSource(id) })
     activeLayerIds.current = []
   }, [])
 
@@ -235,7 +236,15 @@ export function Map({ listings, highlightedId, onMarkerClick, onBoundsChange, ac
     })
 
     listings.forEach(l => {
-      if (!l.lat || !l.lng || markersRef.current.has(l.listing_id)) return
+      if (!l.lat || !l.lng) return
+      const existing = markersRef.current.get(l.listing_id)
+      if (existing) {
+        // Re-apply background color on every update — transit status may have changed
+        const el = existing.getElement()
+        const inner = el.firstElementChild as HTMLElement
+        if (inner) inner.style.background = COLORS[l.transit_status]
+        return
+      }
       const el = document.createElement('div')
       el.style.cssText = `cursor:pointer;`
       const inner = document.createElement('div')
@@ -268,7 +277,7 @@ export function Map({ listings, highlightedId, onMarkerClick, onBoundsChange, ac
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
-      <div style={{ position: 'absolute', bottom: 12, left: 12, background: 'white', border: '1px solid var(--c-border)', borderRadius: 9, padding: '8px 11px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', fontSize: 11, pointerEvents: 'none' }}>
+      <div style={{ position: 'absolute', bottom: 12, left: 12, background: 'var(--c-surface)', border: '1px solid var(--c-border)', borderRadius: 9, padding: '8px 11px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', fontSize: 11, pointerEvents: 'none' }}>
         {([['#16a34a', t('green')],['#ca8a04', t('yellow')],['#dc2626', t('red')],['#9ca3af', t('grey')]] as [string,string][]).map(([color, label]) => (
           <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />

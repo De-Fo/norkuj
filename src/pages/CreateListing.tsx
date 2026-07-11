@@ -5,6 +5,7 @@ import { PROPERTY_TYPE_LABELS } from '../lib/types'
 import { DISTRICT_GROUPS, suggestDistricts, ALL_DISTRICTS, findDistrictsForPoint } from '../lib/districts'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import { useLang } from '../lib/lang'
 
 const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY
 
@@ -45,7 +46,7 @@ const DISTRICTS = ALL_DISTRICTS
 
 const inp: React.CSSProperties = {
   width: '100%', padding: '9px 11px', border: '1px solid var(--c-border)',
-  borderRadius: 8, fontSize: 13, color: 'var(--c-text)', background: 'white', outline: 'none',
+  borderRadius: 8, fontSize: 13, color: 'var(--c-text)', background: 'var(--c-surface)', outline: 'none',
 }
 const label: React.CSSProperties = { fontSize: 12, fontWeight: 500, color: 'var(--c-muted)', marginBottom: 4, display: 'block' }
 
@@ -58,7 +59,7 @@ function Toggle({ checked, onChange, children }: { checked: boolean; onChange: (
         position: 'relative', transition: 'background 0.2s', flexShrink: 0,
       }}>
         <div style={{
-          width: 14, height: 14, borderRadius: '50%', background: 'white',
+          width: 14, height: 14, borderRadius: '50%', background: 'var(--c-surface)',
           position: 'absolute', top: 3, left: checked ? 19 : 3,
           transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
         }} />
@@ -100,10 +101,24 @@ export function CreateListingPage({ onDone, editListing }: Props) {
       images: [],
     } : EMPTY
   )
+  const { t } = useLang()
   const isEdit = !!editListing
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+
+  // ── Form validity per step ──
+  const stepValid = (s: number): boolean => {
+    const f = form
+    switch (s) {
+      case 0: return !!(f.title.trim().length >= 3 && f.description.trim().length >= 10 && f.property_type && f.area_sqm && f.available_from)
+      case 1: return !!f.price_czk
+      case 2: return !!(f.address_street.trim().length >= 3 && f.lat != null && f.lng != null)
+      case 3: return true // images are optional
+      default: return true
+    }
+  }
+  const allValid = stepValid(0) && stepValid(1) && stepValid(2)
   const [confirmClose, setConfirmClose] = useState(false)
   const [districtSuggestions, setDistrictSuggestions] = useState<string[]>([])
   const mapInstance = useRef<maplibregl.Map | null>(null)
@@ -111,7 +126,7 @@ export function CreateListingPage({ onDone, editListing }: Props) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null)
 
   const set = (p: Partial<FormData>) => setForm(f => ({ ...f, ...p }))
-  const STEPS = ['Základní info', 'Cena & detaily', 'Poloha na mapě', 'Fotografie', 'Přehled']
+  const STEPS = [t('_create_step0'), t('_create_step1'), t('_create_step2'), t('_create_step3'), t('_create_step4')]
   const isDirty = form.title.length > 0 || form.description.length > 0 || form.price_czk.length > 0
 
   useEffect(() => {
@@ -168,14 +183,14 @@ export function CreateListingPage({ onDone, editListing }: Props) {
     setUploading(true); setError(null)
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Nejsi přihlášen')
-      if (!form.lat || !form.lng) throw new Error('Vyber polohu na mapě')
+      if (!user) throw new Error(t('_create_error_auth'))
+      if (!form.lat || !form.lng) throw new Error(t('_create_error_location'))
 
       const imagePaths: string[] = isEdit ? [...(editListing!.image_paths ?? [])] : []
       for (const file of form.images) {
         const path = `${user.id}/${Date.now()}_${file.name.replace(/\s+/g, '_')}`
         const { error: upErr } = await supabase.storage.from('listing-images').upload(path, file)
-        if (upErr) throw new Error('Nahrávání fotky selhalo: ' + upErr.message)
+        if (upErr) throw new Error(t('_create_error_upload') + upErr.message)
         imagePaths.push(path)
       }
 
@@ -227,7 +242,7 @@ export function CreateListingPage({ onDone, editListing }: Props) {
 
       setSuccess(true)
     } catch (e: any) {
-      setError(e.message ?? 'Chyba při ukládání')
+      setError(e.message ?? t('_create_error_save'))
     }
     setUploading(false)
   }
@@ -262,35 +277,33 @@ export function CreateListingPage({ onDone, editListing }: Props) {
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
             <span style={{ fontSize: 48 }}>✅</span>
             <h2 style={{ fontSize: 18, fontWeight: 600 }}>
-              {isEdit ? 'Úprava odeslána ke kontrole' : 'Inzerát odeslán ke kontrole'}
+              {isEdit ? t('_create_success_title_edit') : t('_create_success_title')}
             </h2>
             <p style={{ fontSize: 13, color: 'var(--c-muted)', textAlign: 'center', maxWidth: 320 }}>
-              {isEdit
-                ? 'Zkontrolujeme změny a brzy je znovu zveřejníme. Dostaneš email s potvrzením.'
-                : 'Zkontrolujeme ho a brzy zveřejníme. Dostaneš email s potvrzením.'}
+              {isEdit ? t('_create_success_text_edit') : t('_create_success_text')}
             </p>
             <button onClick={onDone} style={{
-              marginTop: 8, padding: '10px 24px', background: 'var(--c-text)', color: 'white',
+              marginTop: 8, padding: '10px 24px', background: 'var(--c-accent)', color: 'white',
               border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer',
             }}>
-              Zpět na hlavní stránku
+              {t('_create_back_home')}
             </button>
           </div>
         ) : confirmClose ? (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14 }}>
             <span style={{ fontSize: 36 }}>⚠️</span>
             <p style={{ fontSize: 14, color: 'var(--c-text)', textAlign: 'center', maxWidth: 280 }}>
-              Rozpracovaný inzerát se neuloží. Opravdu chceš zavřít?
+              {t('_create_confirm_title')}
             </p>
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={() => setConfirmClose(false)} style={{
                 padding: '8px 16px', border: '1px solid var(--c-border)', borderRadius: 8,
-                background: 'white', fontSize: 13, cursor: 'pointer',
-              }}>Pokračovat v editaci</button>
+                background: 'var(--c-surface)', fontSize: 13, cursor: 'pointer',
+              }}>{t('_create_confirm_continue')}</button>
               <button onClick={onDone} style={{
                 padding: '8px 16px', border: 'none', borderRadius: 8,
-                background: '#dc2626', color: 'white', fontSize: 13, fontWeight: 500, cursor: 'pointer',
-              }}>Zahodit a zavřít</button>
+                background: 'var(--c-red)', color: 'white', fontSize: 13, fontWeight: 500, cursor: 'pointer',
+              }}>{t('_create_confirm_discard')}</button>
             </div>
           </div>
         ) : (
@@ -305,8 +318,8 @@ export function CreateListingPage({ onDone, editListing }: Props) {
                     <div style={{
                       width: 22, height: 22, borderRadius: '50%', display: 'flex',
                       alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600,
-                      background: i < step ? '#dcfce7' : i === step ? '#2563eb' : 'var(--c-bg)',
-                      color: i < step ? '#15803d' : i === step ? 'white' : 'var(--c-faint)',
+                      background: i < step ? 'color-mix(in srgb, var(--c-green) 20%, transparent)' : i === step ? '#2563eb' : 'var(--c-bg)',
+                      color: i < step ? 'var(--c-green)' : i === step ? 'white' : 'var(--c-faint)',
                       border: i === step ? 'none' : '1px solid var(--c-border)', flexShrink: 0,
                     }}>{i < step ? '✓' : i + 1}</div>
                     <span style={{ fontSize: 12, color: i === step ? 'var(--c-text)' : 'var(--c-faint)', fontWeight: i === step ? 500 : 400 }}>
@@ -324,51 +337,51 @@ export function CreateListingPage({ onDone, editListing }: Props) {
                 {step === 0 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                     <div>
-                      <label style={label}>Název inzerátu *</label>
-                      <input style={inp} placeholder="Světlý byt 2+kk v centru Prahy" value={form.title} onChange={e => set({ title: e.target.value })} />
+                      <label style={label}>{t('_create_title_label')}</label>
+                      <input style={inp} placeholder={t('_create_title_placeholder')} value={form.title} onChange={e => set({ title: e.target.value })} />
                     </div>
                     <div>
-                      <label style={label}>Popis *</label>
-                      <textarea style={{ ...inp, minHeight: 120, resize: 'vertical' }} placeholder="Popište byt, lokalitu, dostupnost MHD..." value={form.description} onChange={e => set({ description: e.target.value })} />
+                      <label style={label}>{t('_create_desc_label')}</label>
+                      <textarea style={{ ...inp, minHeight: 120, resize: 'vertical' }} placeholder={t('_create_desc_placeholder')} value={form.description} onChange={e => set({ description: e.target.value })} />
                     </div>
                     <div>
-                      <label style={label}>Typ nabídky *</label>
+                      <label style={label}>{t('_create_type_label')}</label>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                         {PROPERTY_TYPES.map(t => (
                           <button key={t} onClick={() => set({ property_type: t })} style={{
                             padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 13,
                             border: form.property_type === t ? 'none' : '1px solid var(--c-border)',
-                            background: form.property_type === t ? 'var(--c-text)' : 'white',
+                            background: form.property_type === t ? 'var(--c-accent)' : 'var(--c-surface)',
                             color: form.property_type === t ? 'white' : 'var(--c-text)',
                           }}>{PROPERTY_TYPE_LABELS[t]}</button>
                         ))}
                       </div>
                       {form.property_type === 'pokoj' && (
                         <p style={{ fontSize: 11, color: 'var(--c-muted)', marginTop: 6 }}>
-                          Pokoj ve sdíleném bytě — vhodné pro spolubydlení.
+                          {t('_create_room_hint')}
                         </p>
                       )}
                     </div>
                     <div>
-                      <label style={label}>Plocha (m²) *</label>
+                      <label style={label}>{t('_create_area_label')}</label>
                       <input style={inp} type="number" placeholder="55" value={form.area_sqm} onChange={e => set({ area_sqm: e.target.value })} />
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                       <div>
-                        <label style={label}>Patro</label>
+                        <label style={label}>{t('_create_floor_label')}</label>
                         <input style={inp} type="number" placeholder="2" value={form.floor} onChange={e => set({ floor: e.target.value })} />
                       </div>
                       <div>
-                        <label style={label}>Dostupné od *</label>
+                        <label style={label}>{t('_create_available_label')}</label>
                         <input style={inp} type="date" value={form.available_from} onChange={e => set({ available_from: e.target.value })} />
                       </div>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                      <Toggle checked={form.furnished} onChange={v => set({ furnished: v })}>Zařízený</Toggle>
-                      <Toggle checked={form.pets_allowed} onChange={v => set({ pets_allowed: v })}>Zvířata OK</Toggle>
-                      <Toggle checked={form.parking} onChange={v => set({ parking: v })}>Parkování</Toggle>
-                      <Toggle checked={form.balcony} onChange={v => set({ balcony: v })}>Balkon</Toggle>
-                      <Toggle checked={form.cellar} onChange={v => set({ cellar: v })}>Sklep</Toggle>
+                      <Toggle checked={form.furnished} onChange={v => set({ furnished: v })}>{t('_create_furnished')}</Toggle>
+                      <Toggle checked={form.pets_allowed} onChange={v => set({ pets_allowed: v })}>{t('_create_pets')}</Toggle>
+                      <Toggle checked={form.parking} onChange={v => set({ parking: v })}>{t('_create_parking')}</Toggle>
+                      <Toggle checked={form.balcony} onChange={v => set({ balcony: v })}>{t('_create_balcony')}</Toggle>
+                      <Toggle checked={form.cellar} onChange={v => set({ cellar: v })}>{t('_create_cellar')}</Toggle>
                     </div>
                   </div>
                 )}
@@ -376,25 +389,25 @@ export function CreateListingPage({ onDone, editListing }: Props) {
                 {step === 1 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                     <div>
-                      <label style={label}>Nájemné (Kč/měs) *</label>
+                      <label style={label}>{t('_create_price_label')}</label>
                       <input style={inp} type="number" placeholder="18000" value={form.price_czk} onChange={e => set({ price_czk: e.target.value })} />
                     </div>
                     <div>
-                      <label style={label}>Zálohy / služby (Kč/měs)</label>
+                      <label style={label}>{t('_create_utilities_label')}</label>
                       <input style={inp} type="number" placeholder="3000" value={form.utilities_czk} onChange={e => set({ utilities_czk: e.target.value })} />
                     </div>
                     <div>
-                      <label style={label}>Kauce (Kč)</label>
+                      <label style={label}>{t('_create_deposit_label')}</label>
                       <input style={inp} type="number" placeholder="36000" value={form.deposit_czk} onChange={e => set({ deposit_czk: e.target.value })} />
                     </div>
                     <div>
-                      <label style={label}>Min. délka nájmu (měsíce)</label>
+                      <label style={label}>{t('_create_minlease_label')}</label>
                       <input style={inp} type="number" placeholder="12" value={form.min_lease_months} onChange={e => set({ min_lease_months: e.target.value })} />
                     </div>
                     {form.price_czk && (
-                      <div style={{ padding: '10px 12px', background: '#f0f9ff', borderRadius: 8, border: '1px solid #bae6fd' }}>
-                        <span style={{ fontSize: 12, color: '#0369a1' }}>
-                          Celkem: <strong>{(parseInt(form.price_czk || '0') + parseInt(form.utilities_czk || '0')).toLocaleString('cs-CZ')} Kč/měs</strong>
+                      <div style={{ padding: '10px 12px', background: 'color-mix(in srgb, var(--c-accent) 10%, transparent)', borderRadius: 8, border: '1px solid color-mix(in srgb, var(--c-accent) 30%, transparent)' }}>
+                        <span style={{ fontSize: 12, color: 'var(--c-accent)' }}>
+                          {t('_create_total')} <strong>{(parseInt(form.price_czk || '0') + parseInt(form.utilities_czk || '0')).toLocaleString('cs-CZ')} Kč/měs</strong>
                         </span>
                       </div>
                     )}
@@ -404,8 +417,8 @@ export function CreateListingPage({ onDone, editListing }: Props) {
                 {step === 2 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                     <div>
-                      <label style={label}>Ulice a číslo *</label>
-                      <input style={inp} placeholder="Mánesova 12, Vinohrady" value={form.address_street}
+                      <label style={label}>{t('_create_street_label')}</label>
+                      <input style={inp} placeholder={t('_create_street_placeholder')} value={form.address_street}
                         onChange={e => {
                           const val = e.target.value
                           set({ address_street: val })
@@ -417,7 +430,7 @@ export function CreateListingPage({ onDone, editListing }: Props) {
                         }} />
                       {districtSuggestions.length > 0 && (
                         <div style={{ marginTop: 5, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: 10, color: 'var(--c-faint)' }}>Našli jsme:</span>
+                          <span style={{ fontSize: 10, color: 'var(--c-faint)' }}>{t('_create_found')}</span>
                           {districtSuggestions.map(s => (
                             <button key={s} onClick={() => {
                               const newDists = [...form.address_districts]
@@ -435,8 +448,8 @@ export function CreateListingPage({ onDone, editListing }: Props) {
                               setDistrictSuggestions([])
                             }} style={{
                               padding: '2px 8px', borderRadius: 10, cursor: 'pointer',
-                              border: '1px solid var(--c-border)', background: '#f0f9ff',
-                              color: '#0369a1', fontSize: 10, fontWeight: 500,
+                              border: '1px solid var(--c-border)', background: 'var(--c-bg)',
+                              color: 'var(--c-accent)', fontSize: 10, fontWeight: 500,
                             }}>
                               {s}
                             </button>
@@ -445,14 +458,14 @@ export function CreateListingPage({ onDone, editListing }: Props) {
                       )}
                     </div>
                     <div>
-                      <label style={label}>Přesná poloha — klikni na mapu *</label>
+                      <label style={label}>{t('_create_map_label')}</label>
                       <div ref={mapContainerRef} style={{ height: 280, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--c-border)' }} />
                       {form.lat
-                        ? <p style={{ fontSize: 11, color: '#15803d', marginTop: 6 }}>✓ Poloha označena ({form.lat.toFixed(5)}, {form.lng?.toFixed(5)})</p>
-                        : <p style={{ fontSize: 11, color: 'var(--c-faint)', marginTop: 6 }}>Klikni na mapu pro označení polohy</p>}
+                        ? <p style={{ fontSize: 11, color: 'var(--c-green)', marginTop: 6 }}>{t('_create_map_done')} ({form.lat.toFixed(5)}, {form.lng?.toFixed(5)})</p>
+                        : <p style={{ fontSize: 11, color: 'var(--c-faint)', marginTop: 6 }}>{t('_create_map_hint')}</p>}
                     </div>
                     <div>
-                      <label style={label}>Čtvrť / Část Prahy * <span style={{fontWeight:400,color:'var(--c-faint)'}}>lze vybrat 1–2</span></label>
+                      <label style={label}>{t('_create_district_label')} <span style={{fontWeight:400,color:'var(--c-faint)'}}>{t('_create_district_hint')}</span></label>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                         {DISTRICTS.map(d => {
                           const active = form.address_districts.includes(d)
@@ -479,7 +492,7 @@ export function CreateListingPage({ onDone, editListing }: Props) {
                         })}
                       </div>
                       {form.address_districts.length === 0 && (
-                        <p style={{ fontSize: 11, color: 'var(--c-faint)', marginTop: 4 }}>Vyber alespoň 1 oblast</p>
+                        <p style={{ fontSize: 11, color: 'var(--c-faint)', marginTop: 4 }}>{t('_create_district_empty')}</p>
                       )}
                     </div>
                   </div>
@@ -488,14 +501,14 @@ export function CreateListingPage({ onDone, editListing }: Props) {
                 {step === 3 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                     <div>
-                      <label style={label}>Fotografie (max 20)</label>
+                      <label style={label}>{t('_create_photos_label')}</label>
                       <label style={{
                         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                         height: 120, border: '2px dashed var(--c-border)', borderRadius: 10,
                         cursor: 'pointer', color: 'var(--c-muted)', fontSize: 13, gap: 6,
                       }}>
                         <span style={{ fontSize: 28 }}>📷</span>
-                        Klikni nebo přetáhni fotky
+                        {t('_create_photos_hint')}
                         <input type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={e => handleImages(e.target.files)} />
                       </label>
                     </div>
@@ -518,21 +531,21 @@ export function CreateListingPage({ onDone, editListing }: Props) {
 
                 {step === 4 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    <h3 style={{ fontSize: 15, fontWeight: 600 }}>Přehled inzerátu</h3>
+                    <h3 style={{ fontSize: 15, fontWeight: 600 }}>{t('_create_review_title')}</h3>
                     {isEdit && (
-                      <div style={{ padding: '10px 12px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, fontSize: 12, color: '#9a3412' }}>
-                        ⚠️ Úprava inzerátu vyžaduje opětovné schválení administrátorem. Inzerát dočasně zmizí z vyhledávání, dokud ho znovu neschválíme.
+                      <div style={{ padding: '10px 12px', background: 'var(--c-bg)', border: '1px solid var(--c-yellow)', borderRadius: 8, fontSize: 12, color: 'var(--c-muted)' }}>
+                        {t('_create_edit_warning')}
                       </div>
                     )}
                     {[
-                      ['Název', form.title],
-                      ['Typ', PROPERTY_TYPE_LABELS[form.property_type as PropertyType] ?? '—'],
-                      ['Plocha', `${form.area_sqm} m²`],
-                      ['Nájemné', `${parseInt(form.price_czk||'0').toLocaleString('cs-CZ')} Kč/měs`],
-                      ['Zálohy', `${parseInt(form.utilities_czk||'0').toLocaleString('cs-CZ')} Kč/měs`],
-                      ['Adresa', `${form.address_street}, ${form.address_districts.join(', ')}`],
-                      ['Poloha', form.lat ? '✓ Označena' : '✗ Chybí'],
-                      ['Fotky', `${form.images.length} fotografií`],
+                      [t('_create_review_name'), form.title],
+                      [t('_create_review_type'), PROPERTY_TYPE_LABELS[form.property_type as PropertyType] ?? '—'],
+                      [t('_create_review_area'), `${form.area_sqm} m²`],
+                      [t('_create_review_price'), `${parseInt(form.price_czk||'0').toLocaleString('cs-CZ')} Kč/měs`],
+                      [t('_create_review_utilities'), `${parseInt(form.utilities_czk||'0').toLocaleString('cs-CZ')} Kč/měs`],
+                      [t('_create_review_address'), `${form.address_street}, ${form.address_districts.join(', ')}`],
+                      [t('_create_review_location'), form.lat ? t('_create_review_ok') : t('_create_review_missing')],
+                      [t('_create_review_photos'), `${form.images.length} ${t('_create_review_photos')}`],
                     ].map(([k, v]) => (
                       <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--c-border)', fontSize: 13 }}>
                         <span style={{ color: 'var(--c-muted)' }}>{k}</span>
@@ -540,7 +553,7 @@ export function CreateListingPage({ onDone, editListing }: Props) {
                       </div>
                     ))}
                     {error && (
-                      <div style={{ padding: '10px 12px', background: '#fee2e2', borderRadius: 8, color: '#b91c1c', fontSize: 12 }}>
+                      <div style={{ padding: '10px 12px', background: 'color-mix(in srgb, var(--c-red) 15%, transparent)', borderRadius: 8, color: 'var(--c-red)', fontSize: 12 }}>
                         {error}
                       </div>
                     )}
@@ -555,20 +568,23 @@ export function CreateListingPage({ onDone, editListing }: Props) {
             }}>
               <button onClick={step === 0 ? requestClose : () => setStep(s => s - 1)} style={{
                 padding: '9px 18px', border: '1px solid var(--c-border)', borderRadius: 8,
-                background: 'white', color: 'var(--c-text)', fontSize: 13, cursor: 'pointer',
+                background: 'var(--c-surface)', color: 'var(--c-text)', fontSize: 13, cursor: 'pointer',
               }}>
-                {step === 0 ? 'Zrušit' : '← Zpět'}
+                {step === 0 ? t('_create_nav_cancel') : t('_create_nav_back')}
               </button>
               {step < 4
-                ? <button onClick={() => setStep(s => s + 1)} style={{
+                ? <button onClick={() => stepValid(step) ? setStep(s => s + 1) : undefined} style={{
                     padding: '9px 18px', border: 'none', borderRadius: 8,
-                    background: 'var(--c-text)', color: 'white', fontSize: 13, fontWeight: 500, cursor: 'pointer',
-                  }}>Pokračovat →</button>
-                : <button onClick={handleSubmit} disabled={uploading} style={{
+                    background: stepValid(step) ? 'var(--c-accent)' : 'var(--c-border-md)',
+                    color: stepValid(step) ? 'white' : 'var(--c-faint)',
+                    fontSize: 13, fontWeight: 500, cursor: stepValid(step) ? 'pointer' : 'not-allowed',
+                  }}>{t('_create_nav_next')}</button>
+                : <button onClick={allValid && !uploading ? handleSubmit : undefined} disabled={uploading || !allValid} style={{
                     padding: '9px 18px', border: 'none', borderRadius: 8,
-                    background: uploading ? 'var(--c-border-md)' : '#16a34a',
-                    color: 'white', fontSize: 13, fontWeight: 500, cursor: uploading ? 'not-allowed' : 'pointer',
-                  }}>{uploading ? 'Odesílám...' : isEdit ? 'Uložit a poslat ke kontrole' : 'Odeslat ke kontrole'}
+                    background: uploading ? 'var(--c-border-md)' : allValid ? 'var(--c-green)' : 'var(--c-border-md)',
+                    color: allValid && !uploading ? 'white' : 'var(--c-faint)',
+                    fontSize: 13, fontWeight: 500, cursor: uploading || !allValid ? 'not-allowed' : 'pointer',
+                  }}>{uploading ? t('_create_submitting') : isEdit ? t('_create_submit_edit') : t('_create_submit')}
                 </button>
               }
             </div>

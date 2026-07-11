@@ -47,7 +47,7 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
     // 1. Always fetch all published listings as the base
     // ═══════════════════════════════════════════════════════════════
     const { data: baseData, error } = await (supabase.rpc as any)('get_published_listings_with_coords')
-    if (error) { console.error(error); setListings([]); return }
+    if (error) { if (import.meta.env.DEV) console.error(error); setListings([]); return }
     let base = (baseData ?? []) as any[]
 
     // ── Expand districts once ──
@@ -239,7 +239,7 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
         return
       }
       if (error || !data || (data as any[]).length < 3) {
-        console.error('[Isochrone] no polygon returned:', error)
+        if (import.meta.env.DEV) console.error('[Isochrone] no polygon returned:', error)
         setIsoPolygon(null)
         return
       }
@@ -247,7 +247,7 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
       setIsoPolygon(rawArr)
     } catch (err) {
       if (reqNo !== isoReqRef.current) return
-      console.error('[Isochrone] fetch failed:', err)
+      if (import.meta.env.DEV) console.error('[Isochrone] fetch failed:', err)
       setIsoPolygon(null)
     }
     setIsoLoading(false)
@@ -277,13 +277,10 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
   const hasDistFilter = filters.districts.length > 0
   const hasColoring = hasTransitFilter || hasDistFilter
 
-  // For rendering: split into "in" (green/yellow/red) and "out" (grey)
+  // For rendering: apply transit-status grouping when filters are active
   const inArea = hasColoring
     ? listingsFilteredByIso.filter(l => l.transit_status !== 'grey')
     : listingsFilteredByIso
-  const outArea = hasColoring
-    ? listingsFilteredByIso.filter(l => l.transit_status === 'grey')
-    : []
 
   return (
     <div style={{ display: 'flex', flex: 1, overflow: 'hidden', height: '100%' }}>
@@ -369,7 +366,7 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
                 }}
                 style={{
                   width: 48, padding: '2px 6px', border: '1px solid var(--c-border)',
-                  borderRadius: 4, fontSize: 12, color: 'var(--c-text)', background: 'white',
+                  borderRadius: 4, fontSize: 12, color: 'var(--c-text)', background: 'var(--c-surface)',
                   outline: 'none', textAlign: 'center',
                 }} />
               <span style={{ fontSize: 11, color: 'var(--c-muted)' }}>{t('iso_minutes')}</span>
@@ -396,7 +393,8 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
                 {t('iso_label')}
               </button>
               {!isoModeActive &&
-                <span style={{ fontSize: 10, color: 'var(--c)', fontWeight: 'bold', whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: 10, color: 'var(--c-muted)', fontWeight: 500, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--c-accent)', opacity: 0.7, animation: 'pulse-iso 2s ease-in-out infinite' }} />
                   {t('iso_description')}
                 </span>
               }
@@ -408,35 +406,40 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
             </div>
           )}
 
-          {/* Sort controls */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: isoCenter ? 0 : 'auto' }}>
-            <select value={filters.sortBy} onChange={e => onChange({ ...filters, sortBy: e.target.value as any })}
-              style={{
-                padding: '2px 6px', border: '1px solid var(--c-border)', borderRadius: 4,
-                fontSize: 10, color: 'var(--c-muted)', background: 'white', outline: 'none',
-              }}>
-              <option value="date">{t('sort_date')}</option>
-              <option value="price">{t('sort_price')}</option>
-              <option value="area">{t('sort_area')}</option>
-            </select>
-            <button onClick={() => onChange({ ...filters, sortDir: filters.sortDir === 'desc' ? 'asc' : 'desc' })}
-              style={{
-                padding: '2px 6px', border: '1px solid var(--c-border)', borderRadius: 4,
-                background: 'transparent', fontSize: 11, color: 'var(--c-muted)', cursor: 'pointer',
-                lineHeight: 1.2,
-              }}>
-              {filters.sortDir === 'desc' ? '↓' : '↑'}
+          {/* Sort + map toggle — locked to right edge */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <select value={filters.sortBy} onChange={e => onChange({ ...filters, sortBy: e.target.value as any })}
+                style={{
+                  padding: '2px 6px', border: '1px solid var(--c-border)', borderRadius: 4,
+                  fontSize: 10, color: 'var(--c-muted)', background: 'var(--c-surface)', outline: 'none',
+                }}>
+                <option value="date">{t('sort_date')}</option>
+                <option value="price">{t('sort_price')}</option>
+                <option value="area">{t('sort_area')}</option>
+              </select>
+              <button onClick={() => onChange({ ...filters, sortDir: filters.sortDir === 'desc' ? 'asc' : 'desc' })}
+                style={{
+                  padding: '2px 6px', border: '1px solid var(--c-border)', borderRadius: 4,
+                  background: 'transparent', fontSize: 11, color: 'var(--c-muted)', cursor: 'pointer',
+                  lineHeight: 1.2,
+                }}>
+                {filters.sortDir === 'desc' ? '↓' : '↑'}
+              </button>
+            </div>
+
+            <button onClick={onToggleMap} style={{
+              padding: '4px 10px', border: '1px solid var(--c-border)', borderRadius: 6,
+              background: showMap ? 'var(--c-surface)' : 'var(--c-accent)',
+              color: showMap ? 'var(--c-text)' : 'white',
+              fontSize: 11, cursor: 'pointer', fontWeight: 500,
+              boxShadow: showMap ? 'none' : '0 0 0 2px color-mix(in srgb, var(--c-accent) 40%, transparent)',
+              flexShrink: 0,
+              animation: showMap ? 'none' : 'pulse-map 2s ease-in-out infinite',
+            }}>
+              {isMobile ? (showMap ? t('mobile_list_btn') : t('mobile_map_btn')) : (showMap ? t('map_toggle_hide') : t('map_toggle_show'))}
             </button>
           </div>
-
-          <button onClick={onToggleMap} style={{
-            padding: '4px 10px', border: '1px solid var(--c-border)', borderRadius: 6,
-            background: showMap && isMobile ? 'var(--c-accent)' : 'transparent',
-            color: showMap && isMobile ? 'white' : 'var(--c-muted)',
-            fontSize: 11, cursor: 'pointer',
-          }}>
-            {isMobile ? (showMap ? t('mobile_list_btn') : t('mobile_map_btn')) : (showMap ? t('map_toggle_hide') : t('map_toggle_show'))}
-          </button>
         </div>
 
         <div ref={listRef} style={{ flex: 1, overflowY: 'auto', padding: 10 }}>
@@ -507,25 +510,6 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
                   </React.Fragment>
                 ))
               })()}
-
-              {/* ── Ostatní (grey) — only when transit-only or district-only ── */}
-              {outArea.length > 0 && (
-                <>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0' }}>
-                    <div style={{ flex: 1, height: 1, background: 'var(--c-border-md)' }} />
-                    <span style={{ fontSize: 10, color: 'var(--c-faint)', whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      Ostatní
-                    </span>
-                    <div style={{ flex: 1, height: 1, background: 'var(--c-border-md)' }} />
-                  </div>
-                  {outArea.map(l => (
-                    <div key={l.listing_id} data-id={l.listing_id}>
-                      <ListingCard listing={l} highlighted={highlightedId === l.listing_id}
-                        onClick={() => onListingClick(l.listing_id)} />
-                    </div>
-                  ))}
-                </>
-              )}
             </div>
           )}
           <Footer />

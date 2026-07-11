@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import type { Listing, ListingStatus } from '../lib/types'
 import { PROPERTY_TYPE_LABELS } from '../lib/types'
 import { formatPrice, formatDate, getImageUrl } from '../lib/utils'
+import { useLang } from '../lib/lang'
 
 interface Props {
   user: User | null
@@ -12,12 +13,12 @@ interface Props {
 }
 
 const STATUS_LABELS: Record<ListingStatus, string> = {
-  draft: 'Koncept',
-  pending_review: 'Čeká na schválení',
-  published: 'Zveřejněno',
-  rented: 'Pronajato',
-  rejected: 'Zamítnuto',
-  deleted: 'Smazáno',
+  draft: '_mylistings_status_draft',
+  pending_review: '_mylistings_status_pending',
+  published: '_mylistings_status_published',
+  rented: '_mylistings_status_rented',
+  rejected: '_mylistings_status_rejected',
+  deleted: '_mylistings_status_deleted',
 }
 
 const STATUS_COLORS: Record<ListingStatus, string> = {
@@ -30,6 +31,7 @@ const STATUS_COLORS: Record<ListingStatus, string> = {
 }
 
 export function MyListingsPage({ user, onBack, onEdit }: Props) {
+  const { t } = useLang()
   const [listings, setListings] = useState<Listing[]>([])
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -50,7 +52,7 @@ export function MyListingsPage({ user, onBack, onEdit }: Props) {
   useEffect(() => { load() }, [user])
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Opravdu chceš tento inzerát smazat? Tato akce je nevratná.')) return
+    if (!confirm(t('_mylistings_confirm_delete'))) return
     setBusyId(id)
     await (supabase.from('listings') as any).update({ status: 'deleted' }).eq('id', id)
     setBusyId(null)
@@ -69,15 +71,15 @@ export function MyListingsPage({ user, onBack, onEdit }: Props) {
   return (
     <div style={{ maxWidth: 720, margin: '32px auto', padding: 16 }}>
       <button onClick={onBack} style={{ marginBottom: 16, padding: '8px 14px', border: '1px solid var(--c-border)', borderRadius: 8, background: 'var(--c-surface)', cursor: 'pointer', fontSize: 13 }}>
-        ← Zpět
+        {t('_mylistings_back')}
       </button>
 
-      <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>Moje inzeráty</h2>
+      <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>{t('_mylistings_title')}</h2>
 
-      {loading && <p style={{ fontSize: 13, color: 'var(--c-muted)' }}>Načítám...</p>}
+      {loading && <p style={{ fontSize: 13, color: 'var(--c-muted)' }}>{t('loading')}</p>}
 
       {!loading && listings.length === 0 && (
-        <p style={{ fontSize: 13, color: 'var(--c-muted)' }}>Zatím nemáš žádné inzeráty.</p>
+        <p style={{ fontSize: 13, color: 'var(--c-muted)' }}>{t('_mylistings_empty')}</p>
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -94,33 +96,33 @@ export function MyListingsPage({ user, onBack, onEdit }: Props) {
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.title}</p>
               <p style={{ fontSize: 12, color: 'var(--c-muted)' }}>
-                {PROPERTY_TYPE_LABELS[l.property_type]} · {formatPrice(l.price_total_czk)} · přidáno {formatDate(l.created_at)}
+                {PROPERTY_TYPE_LABELS[l.property_type]} · {formatPrice(l.price_total_czk)} · {t('_mylistings_added')} {formatDate(l.created_at)}
               </p>
               <span style={{
                 display: 'inline-block', marginTop: 4, fontSize: 11, fontWeight: 600,
                 color: 'white', background: STATUS_COLORS[l.status], padding: '2px 8px', borderRadius: 6,
               }}>
-                {STATUS_LABELS[l.status]}
+                {t(STATUS_LABELS[l.status])}
               </span>
               {l.status === 'rejected' && (l as any).rejection_reason && (
-                <p style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>
-                  Důvod zamítnutí: {(l as any).rejection_reason}
+                <p style={{ fontSize: 11, color: 'var(--c-red)', marginTop: 4 }}>
+                  {t('_mylistings_rejection_reason')} {(l as any).rejection_reason}
                 </p>
               )}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
               {(l.status === 'draft' || l.status === 'published' || l.status === 'rejected') && (
-                <button onClick={() => onEdit(l)} style={{ padding: '6px 12px', fontSize: 12, border: '1px solid var(--c-border)', borderRadius: 7, background: 'white', cursor: 'pointer' }}>
-                  Upravit
+                <button onClick={() => onEdit(l)} style={{ padding: '6px 12px', fontSize: 12, border: '1px solid var(--c-border)', borderRadius: 7, background: 'var(--c-surface)', cursor: 'pointer' }}>
+                  {t('_mylistings_edit')}
                 </button>
               )}
               {l.status === 'published' && (
-                <button onClick={() => handleMarkRented(l.id)} disabled={busyId === l.id} style={{ padding: '6px 12px', fontSize: 12, border: 'none', borderRadius: 7, background: '#2563eb', color: 'white', cursor: 'pointer' }}>
-                  Pronajato
+                <button onClick={() => handleMarkRented(l.id)} disabled={busyId === l.id} style={{ padding: '6px 12px', fontSize: 12, border: 'none', borderRadius: 7, background: 'var(--c-accent)', color: 'white', cursor: 'pointer' }}>
+                  {t('_mylistings_mark_rented')}
                 </button>
               )}
-              <button onClick={() => handleDelete(l.id)} disabled={busyId === l.id} style={{ padding: '6px 12px', fontSize: 12, border: 'none', borderRadius: 7, background: '#fee2e2', color: '#b91c1c', cursor: 'pointer' }}>
-                Smazat
+              <button onClick={() => handleDelete(l.id)} disabled={busyId === l.id} style={{ padding: '6px 12px', fontSize: 12, border: 'none', borderRadius: 7, background: 'color-mix(in srgb, var(--c-red) 15%, transparent)', color: 'var(--c-red)', cursor: 'pointer' }}>
+                {t('_mylistings_delete')}
               </button>
             </div>
           </div>

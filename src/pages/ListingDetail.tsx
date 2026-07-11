@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Listing } from '../lib/types'
 import { PROPERTY_TYPE_LABELS } from '../lib/types'
@@ -31,8 +31,8 @@ function MiniMap({ lat, lng }: { lat: number; lng: number; title: string }) {
 
   return (
     <div style={{ marginBottom: 20 }}>
-      <h3 style={{ fontSize: 12, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 8px' }}>{t('_detail_location')}</h3>
-      <div ref={ref} style={{ width: '100%', height: 200, borderRadius: 10, overflow: 'hidden', border: '1px solid #e2e8f0' }} />
+      <h3 style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 8px' }}>{t('_detail_location')}</h3>
+      <div ref={ref} style={{ width: '100%', height: 200, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--c-border)' }} />
     </div>
   )
 }
@@ -64,7 +64,10 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [activeImg, setActiveImg] = useState(0)
   const [showContact, setShowContact] = useState(false)
+  const [lightboxOpen, setLightboxOpen] = useState(false)
   const user = propUser
+  const [shareToast, setShareToast] = useState(false)
+  const shareToastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   useEffect(() => {
     if (!listingId) return
@@ -82,14 +85,14 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
         .maybeSingle()
 
       if (error) {
-        console.error('[ListingDetail] fetch error:', error)
-        setErrorMsg(`Chyba: ${error.message}`)
+        if (import.meta.env.DEV) console.error('[ListingDetail] fetch error:', error)
+        setErrorMsg('Inzerát nebyl nalezen nebo není zveřejněn.')
         setLoading(false)
         return
       }
 
       if (!data) {
-        console.warn('[ListingDetail] no data returned for id:', listingId)
+        if (import.meta.env.DEV) console.warn('[ListingDetail] no data returned for id:', listingId)
         setErrorMsg('Inzerát nebyl nalezen nebo není zveřejněn.')
         setLoading(false)
         return
@@ -103,10 +106,51 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
   }, [listingId])
 
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (lightboxOpen) setLightboxOpen(false)
+        else onClose()
+      }
+    }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [onClose])
+  }, [onClose, lightboxOpen])
+
+  useEffect(() => {
+    if (!lightboxOpen || !listing?.image_paths || listing.image_paths.length < 2) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') setActiveImg(i => (i - 1 + listing.image_paths.length) % listing.image_paths.length)
+      if (e.key === 'ArrowRight') setActiveImg(i => (i + 1) % listing.image_paths.length)
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [lightboxOpen, listing?.image_paths])
+
+  // Clean up share toast timer on unmount
+  useEffect(() => {
+    return () => { clearTimeout(shareToastTimer.current) }
+  }, [])
+
+  const handleShare = useCallback(async () => {
+    const url = `${window.location.origin}/listing/${listingId}`
+    // Always copy to clipboard first — shows toast independently of native share sheet
+    try {
+      await navigator.clipboard.writeText(url)
+      setShareToast(true)
+      clearTimeout(shareToastTimer.current)
+      shareToastTimer.current = setTimeout(() => setShareToast(false), 2500)
+    } catch {
+      // clipboard write failed — continue to native share as fallback
+    }
+    // Also open native share sheet when available (mobile, Mac Safari)
+    if (navigator.share) {
+      try {
+        await navigator.share({ url })
+      } catch {
+        // user cancelled native share sheet — no-op, toast already shown
+      }
+    }
+  }, [listingId])
 
   const amenities = listing ? [
     listing.furnished    && t('amenities_furnished'),
@@ -124,17 +168,31 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
       <div style={{
         width: 'min(80%, 900px)',
         height: '85vh', maxHeight: window.innerWidth < 768 ? '100dvh' : '85vh',
-        background: 'white', borderRadius: window.innerWidth < 768 ? 0 : 16,
+        background: 'var(--c-surface)', borderRadius: window.innerWidth < 768 ? 0 : 16,
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
         boxShadow: window.innerWidth < 768 ? 'none' : '0 24px 64px rgba(0,0,0,0.35)',
         position: 'relative',
       }}>
 
+        {/* Share button */}
+        <button onClick={handleShare}
+          title={t('_detail_share')}
+          style={{
+            position: 'absolute', top: 12, right: 102, zIndex: 10,
+            width: 32, height: 32, borderRadius: '50%', border: 'none',
+            background: 'rgba(0,0,0,0.45)', color: 'white',
+            fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transition: 'transform 0.15s',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.15)')}
+          onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
+        >🔗</button>
+
         {/* Favorite star */}
         {onToggleFavorite && propUser && (
           <button onClick={() => onToggleFavorite(listingId)}
             style={{
-              position: 'absolute', top: 12, right: 52, zIndex: 10,
+              position: 'absolute', top: 12, right: 56, zIndex: 10,
               width: 32, height: 32, borderRadius: '50%', border: 'none',
               background: 'rgba(0,0,0,0.45)', color: isFavorited ? '#fbbf24' : 'white',
               fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -152,14 +210,25 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
         {loading && (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
             <div style={{ width: 28, height: 28, borderRadius: '50%', border: '2.5px solid #2563eb', borderTopColor: 'transparent', animation: 'spin 0.7s linear infinite' }} />
-            <span style={{ fontSize: 12, color: '#94a3b8' }}>{t('_detail_loading')}</span>
+            <span style={{ fontSize: 12, color: 'var(--c-faint)' }}>{t('_detail_loading')}</span>
+          </div>
+        )}
+
+        {shareToast && (
+          <div style={{
+            position: 'absolute', bottom: 256, left: '50%', transform: 'translateX(-50%)', zIndex: 20,
+            background: 'rgba(18, 166, 45, 0.88)', color: 'white', fontSize: 13, padding: '8px 18px',
+            borderRadius: 8, whiteSpace: 'nowrap', pointerEvents: 'none',
+            transition: 'opacity 0.2s',
+          }}>
+            {t('_detail_share_copied')}
           </div>
         )}
 
         {errorMsg && !loading && (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32 }}>
             <span style={{ fontSize: 40 }}>😕</span>
-            <p style={{ color: '#64748b', fontSize: 14, textAlign: 'center', maxWidth: 280 }}>{errorMsg}</p>
+            <p style={{ color: 'var(--c-muted)', fontSize: 14, textAlign: 'center', maxWidth: 280 }}>{errorMsg}</p>
             <button onClick={onClose} style={{ padding: '8px 20px', border: '1px solid var(--c-border)', borderRadius: 8, background: 'var(--c-surface)', cursor: 'pointer', fontSize: 13, color: 'var(--c-text)' }}>{t('_detail_close')}</button>
           </div>
         )}
@@ -174,17 +243,31 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
                   <img
                     src={getImageUrl(listing.image_paths[activeImg])}
                     alt={listing.title}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.95 }}
+                    onClick={() => setLightboxOpen(true)}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.95, cursor: 'pointer' }}
                     onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
                   />
                   <div style={{ position: 'absolute', top: 12, left: 12, background: 'rgba(0,0,0,0.5)', color: 'white', fontSize: 11, padding: '3px 8px', borderRadius: 6 }}>
                     {activeImg + 1} / {listing.image_paths.length}
                   </div>
+                  {/* Maximize button */}
+                  <button onClick={() => setLightboxOpen(true)}
+                    title="Zobrazit na celou obrazovku"
+                    style={{
+                      position: 'absolute', bottom: 12, right: 12, zIndex: 5,
+                      width: 32, height: 32, borderRadius: 6, border: 'none',
+                      background: 'rgba(0,0,0,0.5)', color: 'white', fontSize: 14,
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      opacity: 0.8, transition: 'opacity 0.2s',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                    onMouseLeave={e => (e.currentTarget.style.opacity = '0.8')}
+                  >⛶</button>
                   {listing.image_paths.length > 1 && (
                     <>
-                      <button onClick={() => setActiveImg(i => (i - 1 + listing.image_paths.length) % listing.image_paths.length)}
+                      <button onClick={(e) => { e.stopPropagation(); setActiveImg(i => (i - 1 + listing.image_paths.length) % listing.image_paths.length) }}
                         style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.4)', color: 'white', fontSize: 20, cursor: 'pointer' }}>‹</button>
-                      <button onClick={() => setActiveImg(i => (i + 1) % listing.image_paths.length)}
+                      <button onClick={(e) => { e.stopPropagation(); setActiveImg(i => (i + 1) % listing.image_paths.length) }}
                         style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.4)', color: 'white', fontSize: 20, cursor: 'pointer' }}>›</button>
                       <div style={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 5 }}>
                         {listing.image_paths.map((_, i) => (
@@ -195,9 +278,94 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
                   )}
                 </>
               ) : (
-                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#334155', fontSize: 48 }}>🏠</div>
+                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--c-text-secondary)', fontSize: 48 }}>🏠</div>
               )}
             </div>
+
+            {/* Lightbox overlay */}
+            {lightboxOpen && listing.image_paths && listing.image_paths.length > 0 && (
+              <div
+                onClick={() => setLightboxOpen(false)}
+                style={{
+                  position: 'fixed', inset: 0, zIndex: 70, background: 'rgba(0,0,0,0.92)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                <button onClick={() => setLightboxOpen(false)}
+                  style={{
+                    position: 'absolute', top: 16, right: 16, zIndex: 5,
+                    width: 40, height: 40, borderRadius: '50%', border: 'none',
+                    background: 'rgba(255,255,255,0.15)', color: 'white', fontSize: 20,
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.3)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.15)')}
+                >✕</button>
+
+                {/* Counter */}
+                <div style={{
+                  position: 'absolute', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+                  display: 'flex', alignItems: 'center', gap: 12, zIndex: 5,
+                }}>
+                  <div style={{ background: 'rgba(255,255,255,0.15)', color: 'white', fontSize: 12, padding: '4px 12px', borderRadius: 6 }}>
+                    {activeImg + 1} / {listing.image_paths.length}
+                  </div>
+                </div>
+
+                {/* Dots */}
+                {listing.image_paths.length > 1 && (
+                  <div style={{
+                    position: 'absolute', bottom: 68, left: '50%', transform: 'translateX(-50%)',
+                    display: 'flex', gap: 6, zIndex: 5,
+                  }}>
+                    {listing.image_paths.map((_, i) => (
+                      <button key={i} onClick={(e) => { e.stopPropagation(); setActiveImg(i) }}
+                        style={{
+                          width: i === activeImg ? 22 : 8, height: 8, borderRadius: 4, border: 'none',
+                          background: i === activeImg ? 'white' : 'rgba(255,255,255,0.4)',
+                          cursor: 'pointer', padding: 0, transition: 'all 0.2s',
+                        }} />
+                    ))}
+                  </div>
+                )}
+
+                {/* Image */}
+                <img
+                  src={getImageUrl(listing.image_paths[activeImg])}
+                  alt={listing.title}
+                  onClick={e => e.stopPropagation()}
+                  style={{ maxWidth: '95vw', maxHeight: '95vh', objectFit: 'contain', userSelect: 'none' }}
+                />
+
+                {/* Prev/Next arrows */}
+                {listing.image_paths.length > 1 && (
+                  <>
+                    <button onClick={(e) => { e.stopPropagation(); setActiveImg(i => (i - 1 + listing.image_paths.length) % listing.image_paths.length) }}
+                      style={{
+                        position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)',
+                        width: 44, height: 44, borderRadius: '50%', border: 'none',
+                        background: 'rgba(255,255,255,0.1)', color: 'white', fontSize: 24,
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        transition: 'background 0.15s',
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.25)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
+                    >‹</button>
+                    <button onClick={(e) => { e.stopPropagation(); setActiveImg(i => (i + 1) % listing.image_paths.length) }}
+                      style={{
+                        position: 'absolute', right: 16, top: '50%', transform: 'translateY(-50%)',
+                        width: 44, height: 44, borderRadius: '50%', border: 'none',
+                        background: 'rgba(255,255,255,0.1)', color: 'white', fontSize: 24,
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        transition: 'background 0.15s',
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.25)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
+                    >›</button>
+                  </>
+                )}
+              </div>
+            )}
 
             {/* Body */}
             <div style={{ padding: window.innerWidth < 768 ? '16px' : '24px 28px', display: 'flex', flexDirection: window.innerWidth < 768 ? 'column' : 'row', gap: 28 }}>
@@ -205,23 +373,23 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
               {/* Left */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
-                  <h1 style={{ fontSize: 20, fontWeight: 700, color: '#0f172a', lineHeight: 1.3, margin: 0 }}>{listing.title}</h1>
+                  <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--c-text)', lineHeight: 1.3, margin: 0 }}>{listing.title}</h1>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
                     <div style={{ fontSize: 22, fontWeight: 700, color: '#2563eb' }}>{formatPrice(listing.price_total_czk)}</div>
                     {listing.utilities_czk > 0 && (
-                      <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                      <div style={{ fontSize: 11, color: 'var(--c-muted)', marginTop: 2 }}>
                         nájem {formatPrice(listing.price_czk)} + zálohy {listing.utilities_czk.toLocaleString('cs-CZ')} Kč
                       </div>
                     )}
                   </div>
                 </div>
 
-                <p style={{ fontSize: 14, color: '#64748b', margin: '0 0 20px' }}>
+                <p style={{ fontSize: 14, color: 'var(--c-muted)', margin: '0 0 20px' }}>
                   📍 {listing.address_street}{listing.address_district ? `, ${listing.address_district}` : ''}, Praha
                 </p>
 
                 {/* Stats */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20, padding: '14px 0', borderTop: '1px solid #e2e8f0', borderBottom: '1px solid #e2e8f0', marginBottom: 20 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20, padding: '14px 0', borderTop: '1px solid var(--c-border)', borderBottom: '1px solid var(--c-border)', marginBottom: 20 }}>
                   {([
                     [t('_detail_floorplan'), PROPERTY_TYPE_LABELS[listing.property_type]],
                     [t('_detail_area'), `${listing.area_sqm} m²`],
@@ -233,8 +401,8 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
                     .filter((x): x is [string,string] => x !== null)
                     .map(([k, v]) => (
                       <div key={k}>
-                        <div style={{ fontSize: 10, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, marginBottom: 2 }}>{k}</div>
-                        <div style={{ fontSize: 14, fontWeight: 500, color: '#0f172a' }}>{v}</div>
+                        <div style={{ fontSize: 10, color: 'var(--c-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, marginBottom: 2 }}>{k}</div>
+                        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--c-text)' }}>{v}</div>
                       </div>
                     ))}
                 </div>
@@ -243,15 +411,15 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
                 {amenities.length > 0 && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 20 }}>
                     {(amenities as string[]).map(a => (
-                      <span key={a} style={{ padding: '4px 10px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 20, fontSize: 12, color: '#0f172a' }}>{a}</span>
+                      <span key={a} style={{ padding: '4px 10px', background: 'var(--c-bg)', border: '1px solid var(--c-border)', borderRadius: 20, fontSize: 12, color: 'var(--c-text)' }}>{a}</span>
                     ))}
                   </div>
                 )}
 
                 {/* Description */}
                 <div style={{ marginBottom: 20 }}>
-                  <h3 style={{ fontSize: 12, fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 8px' }}>{t('_detail_description')}</h3>
-                  <p style={{ fontSize: 14, lineHeight: 1.7, whiteSpace: 'pre-wrap', color: '#0f172a', margin: 0 }}>{listing.description}</p>
+                  <h3 style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 8px' }}>{t('_detail_description')}</h3>
+                  <p style={{ fontSize: 14, lineHeight: 1.7, whiteSpace: 'pre-wrap', color: 'var(--c-text)', margin: 0 }}>{listing.description}</p>
                 </div>
 
                 {/* Mini map — extract from PostGIS WKB hex, GeoJSON, or WKT */}
@@ -291,7 +459,7 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
                       <img key={i} src={getImageUrl(path)} alt=""
                         onClick={() => setActiveImg(i)}
                         onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-                        style={{ width: 56, height: 48, objectFit: 'cover', borderRadius: 6, cursor: 'pointer', border: i === activeImg ? '2px solid #2563eb' : '1px solid #e2e8f0', opacity: i === activeImg ? 1 : 0.65, transition: 'all 0.15s' }} />
+                        style={{ width: 56, height: 48, objectFit: 'cover', borderRadius: 6, cursor: 'pointer', border: i === activeImg ? '2px solid var(--c-accent)' : '1px solid var(--c-border)', opacity: i === activeImg ? 1 : 0.65, transition: 'all 0.15s' }} />
                     ))}
                   </div>
                 )}
@@ -299,10 +467,10 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
 
               {/* Right — contact */}
               <div style={{ width: window.innerWidth < 768 ? '100%' : 220, flexShrink: 0 }}>
-                <div style={{ border: '1px solid #e2e8f0', borderRadius: 12, padding: 16, position: 'sticky', top: 0 }}>
+                <div style={{ border: '1px solid var(--c-border)', borderRadius: 12, padding: 16, position: 'sticky', top: 0 }}>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-                    <div style={{ width: 42, height: 42, borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
+                    <div style={{ width: 42, height: 42, borderRadius: '50%', background: 'var(--c-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
                       {listing.owner?.avatar_url
                         ? <img src={listing.owner.avatar_url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
                         : <span style={{ fontSize: 20 }}>👤</span>}
@@ -327,7 +495,7 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
                         <p style={{ fontSize: 11, color: 'var(--c-muted)' }}>{t('_detail_contact_note')}</p>
                       </div>
                     ) : (
-                      <button onClick={() => setShowContact(true)} style={{ width: '100%', padding: '11px 0', background: '#16a34a', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                      <button onClick={() => setShowContact(true)} style={{ width: '100%', padding: '11px 0', background: 'var(--c-green)', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
                         {t('_detail_contact_btn')}
                       </button>
                     )
@@ -338,14 +506,14 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
                       </p>
                       <button
                         onClick={() => { onClose(); onRequestAuth?.() }}
-                        style={{ width: '100%', padding: '10px 0', background: 'var(--c-text)', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
+                        style={{ width: '100%', padding: '10px 0', background: 'var(--c-accent)', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
                       >
                         {t('_detail_login_btn')}
                       </button>
                     </div>
                   )}
 
-                  <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid #e2e8f0', fontSize: 11, color: '#94a3b8', lineHeight: 1.6 }}>
+                  <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--c-border)', fontSize: 11, color: 'var(--c-faint)', lineHeight: 1.6 }}>
                     {t('_detail_added')} {formatDate(listing.created_at)}
                   </div>
                 </div>

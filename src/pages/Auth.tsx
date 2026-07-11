@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { Wordmark } from '../components/Wordmark'
+import { useLang } from '../lib/lang'
 
 type Mode = 'login' | 'register' | 'reset'
 
@@ -14,6 +15,7 @@ interface Props {
 }
 
 export function AuthPage({ onBack }: Props) {
+  const { t } = useLang()
   const [mode, setMode] = useState<Mode>('login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -49,18 +51,18 @@ export function AuthPage({ onBack }: Props) {
           [{ id: data.user.id, display_name: displayName, phone, email }] as any,
           { onConflict: 'id', ignoreDuplicates: false }
         )
-        setMsg({ ok: true, text: 'Zkontroluj email a potvrď registraci.' })
+        setMsg({ ok: true, text: t('_auth_register_success') })
       }
     } else if (mode === 'login') {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) setMsg({ ok: false, text: 'Špatný email nebo heslo.' })
+      if (error) setMsg({ ok: false, text: t('_auth_error_invalid') })
     } else if (mode === 'reset') {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: window.location.origin + window.location.pathname,
       })
       setMsg(error
         ? { ok: false, text: error.message }
-        : { ok: true, text: 'Poslali jsme ti email s odkazem na obnovu hesla.' })
+        : { ok: true, text: t('_auth_reset_sent') })
     }
     setLoading(false)
   }
@@ -70,7 +72,7 @@ export function AuthPage({ onBack }: Props) {
     const { error } = await supabase.auth.updateUser({ password: newPassword })
     setLoading(false)
     if (error) { setMsg({ ok: false, text: error.message }); return }
-    setMsg({ ok: true, text: 'Heslo změněno. Přesměrovávám...' })
+    setMsg({ ok: true, text: t('_auth_password_changed') })
     setTimeout(() => {
       window.location.hash = ''
       setRecoveryMode(false)
@@ -90,15 +92,15 @@ export function AuthPage({ onBack }: Props) {
           <Wordmark />
         </div>
         <div style={{ width: '100%', maxWidth: 380, background: 'var(--c-surface)', borderRadius: 12, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
-          <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>Nastav nové heslo</p>
+          <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>{t('_auth_reset_title')}</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <input style={inp} placeholder="Nové heslo" type="password" value={newPassword}
+            <input style={inp} placeholder={t('_auth_newpassword_placeholder')} type="password" value={newPassword}
               onChange={e => setNewPassword(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleUpdatePassword()} />
-            {msg && <div style={{ fontSize: 12, color: msg.ok ? '#16a34a' : '#dc2626' }}>{msg.text}</div>}
+            {msg && <div style={{ fontSize: 12, color: msg.ok ? 'var(--c-green)' : 'var(--c-red)' }}>{msg.text}</div>}
             <button onClick={handleUpdatePassword} disabled={loading || newPassword.length < 6}
-              style={{ padding: '11px 0', background: '#0f172a', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-              {loading ? '...' : 'Uložit nové heslo'}
+              style={{ padding: '11px 0', background: 'var(--c-accent)', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+              {loading ? '...' : t('_auth_submit_newpassword')}
             </button>
           </div>
         </div>
@@ -116,7 +118,7 @@ export function AuthPage({ onBack }: Props) {
           borderRadius: 8, fontSize: 13, color: 'var(--c-text)', cursor: 'pointer',
         }}
       >
-        ← Zpět
+        {t('_auth_back')}
       </button>
 
       <div onClick={onBack} style={{ cursor: 'pointer', marginBottom: 24 }}>
@@ -124,7 +126,7 @@ export function AuthPage({ onBack }: Props) {
       </div>
 
       <div style={{ width: '100%', maxWidth: 380, background: 'var(--c-surface)', borderRadius: 12, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
-        <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--c-muted)', marginBottom: 16 }}>Pronájem bez realitky</p>
+        <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--c-muted)', marginBottom: 16 }}>{t('_auth_subtitle')}</p>
 
         {mode !== 'reset' && (
           <div style={{ display: 'flex', background: 'var(--c-bg)', borderRadius: 8, padding: 3, marginBottom: 16 }}>
@@ -135,26 +137,26 @@ export function AuthPage({ onBack }: Props) {
                 color: mode === m ? 'var(--c-text)' : 'var(--c-muted)',
                 fontSize: 13, fontWeight: mode === m ? 500 : 400, cursor: 'pointer',
                 boxShadow: mode === m ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-              }}>{m === 'login' ? 'Přihlásit se' : 'Registrovat'}</button>
+              }}>{m === 'login' ? t('_auth_tab_login') : t('_auth_tab_register')}</button>
             ))}
           </div>
         )}
 
         {mode === 'reset' && (
-          <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>Obnovit heslo</p>
+          <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>{t('_auth_recovery_title')}</p>
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {mode === 'register' && (
             <>
-              <input style={inp} placeholder="Jméno" value={displayName} onChange={e => setDisplayName(e.target.value)} />
-              <input style={inp} placeholder="Telefon (+420...)" value={phone} type="tel" onChange={e => setPhone(e.target.value)} />
+              <input style={inp} placeholder={t('_auth_name_placeholder')} value={displayName} onChange={e => setDisplayName(e.target.value)} />
+              <input style={inp} placeholder={t('_auth_phone_placeholder')} value={phone} type="tel" onChange={e => setPhone(e.target.value)} />
             </>
           )}
-          <input style={inp} placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} />
+          <input style={inp} placeholder={t('_auth_email_placeholder')} value={email} onChange={e => setEmail(e.target.value)} />
 
           {mode !== 'reset' && (
-            <input style={inp} placeholder="Heslo" type="password" value={password}
+            <input style={inp} placeholder={t('_auth_password_placeholder')} type="password" value={password}
               onChange={e => setPassword(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleSubmit()} />
           )}
@@ -162,30 +164,30 @@ export function AuthPage({ onBack }: Props) {
           {mode === 'login' && (
             <button onClick={() => { setMode('reset'); setMsg(null) }}
               style={{ background: 'none', border: 'none', color: 'var(--c-muted)', fontSize: 12, textAlign: 'right', cursor: 'pointer', padding: 0 }}>
-              Zapomenuté heslo?
+              {t('_auth_forgot')}
             </button>
           )}
 
           {msg && (
-            <div style={{ fontSize: 12, color: msg.ok ? '#16a34a' : '#dc2626' }}>{msg.text}</div>
+            <div style={{ fontSize: 12, color: msg.ok ? 'var(--c-green)' : 'var(--c-red)' }}>{msg.text}</div>
           )}
 
-          <button onClick={handleSubmit} disabled={loading} style={{ padding: '11px 0', background: '#0f172a', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-            {loading ? '...' : mode === 'login' ? 'Přihlásit se' : mode === 'register' ? 'Vytvořit účet' : 'Poslat odkaz na obnovu'}
+          <button onClick={handleSubmit} disabled={loading} style={{ padding: '11px 0', background: 'var(--c-accent)', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+            {loading ? '...' : mode === 'login' ? t('_auth_submit_login') : mode === 'register' ? t('_auth_submit_register') : t('_auth_submit_reset')}
           </button>
 
           {mode === 'reset' && (
             <button onClick={() => { setMode('login'); setMsg(null) }}
               style={{ background: 'none', border: 'none', color: 'var(--c-muted)', fontSize: 12, cursor: 'pointer', padding: 0 }}>
-              ← Zpět na přihlášení
+              {t('_auth_back_to_login')}
             </button>
           )}
 
           {mode !== 'reset' && (
             <>
-              <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--c-muted)' }}>nebo</div>
+              <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--c-muted)' }}>{t('_auth_or')}</div>
               <button onClick={handleGoogle} style={{ padding: '11px 0', background: 'var(--c-bg)', border: '1px solid var(--c-border)', borderRadius: 8, fontSize: 13, cursor: 'pointer' }}>
-                Pokračovat přes Google
+                {t('_auth_google')}
               </button>
             </>
           )}

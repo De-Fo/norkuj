@@ -29,7 +29,7 @@ function Chip({ active, onClick, children, color }: {
       display: 'flex', alignItems: 'center', gap: 4,
       padding: '4px 10px', borderRadius: 20, cursor: 'pointer',
       border: active ? 'none' : '1px solid var(--c-border)',
-      background: active ? (color ?? 'var(--c-text)') : 'var(--c-surface)',
+      background: active ? (color ?? 'var(--c-accent)') : 'var(--c-surface)',
       color: active ? '#fff' : 'var(--c-muted)',
       fontSize: 12, fontWeight: active ? 500 : 400,
       whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.12s',
@@ -78,10 +78,10 @@ export function FilterPanel({ filters, onChange, resultCount, loading, isMobile 
             <span key={line} style={{ width: 8, height: 8, borderRadius: '50%', background: lineColor(line), flexShrink: 0 }} />
           ))}
         </div>
-        <span style={{ fontSize: 12, color: 'var(--c-muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <span style={{ fontSize: 12, color: 'var(--c-text)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {summary || t('search_hint')}
         </span>
-        <span style={{ fontSize: 11, color: 'var(--c-faint)' }}>
+        <span style={{ fontSize: 11, color: 'var(--c-muted)' }}>
           {loading ? t('loading') : `${resultCount} ${t('listings_count')}`}
         </span>
         <span style={{
@@ -116,7 +116,7 @@ export function FilterPanel({ filters, onChange, resultCount, loading, isMobile 
                 position: 'relative', transition: 'background 0.2s', flexShrink: 0,
               }}>
               <div style={{
-                width: 16, height: 16, borderRadius: '50%', background: 'white',
+                width: 16, height: 16, borderRadius: '50%', background: 'var(--c-surface)',
                 position: 'absolute', top: 3, left: filters.filterByMapArea ? 19 : 3,
                 transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
               }} />
@@ -165,11 +165,11 @@ export function FilterPanel({ filters, onChange, resultCount, loading, isMobile 
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
               <input type="number" min={0} max={999999} placeholder={lang === 'en' ? 'from' : 'od'} value={filters.minPrice || ''}
                 onChange={e => set({ minPrice: parseInt(e.target.value) || 0 })}
-                style={{ width: 72, padding: '4px 7px', border: '1px solid var(--c-border)', borderRadius: 6, fontSize: 12, outline: 'none', color: 'var(--c-text)' }} />
+                style={{ width: 72, padding: '4px 7px', border: '1px solid var(--c-border)', borderRadius: 6, fontSize: 12, outline: 'none', color: 'var(--c-text)', background: 'var(--c-surface)' }} />
               <span style={{ fontSize: 11, color: 'var(--c-faint)' }}>—</span>
               <input type="number" min={0} max={999999} placeholder={lang === 'en' ? 'to' : 'do'} value={filters.maxPrice || ''}
                 onChange={e => set({ maxPrice: parseInt(e.target.value) || 0 })}
-                style={{ width: 72, padding: '4px 7px', border: '1px solid var(--c-border)', borderRadius: 6, fontSize: 12, outline: 'none', color: 'var(--c-text)' }} />
+                style={{ width: 72, padding: '4px 7px', border: '1px solid var(--c-border)', borderRadius: 6, fontSize: 12, outline: 'none', color: 'var(--c-text)', background: 'var(--c-surface)' }} />
             </div>
           </Section>
 

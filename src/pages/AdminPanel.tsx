@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { PROPERTY_TYPE_LABELS, type PropertyType } from '../lib/types'
 import { formatPrice, formatDate, getImageUrl } from '../lib/utils'
+import { useLang } from '../lib/lang'
 
 const ADMIN_UIDS = (import.meta.env.VITE_ADMIN_UIDS ?? '').split(',').map((s: string) => s.trim()).filter(Boolean)
 
@@ -40,11 +41,11 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  pending_review: 'Čeká',
-  published:      'Zveřejněn',
-  rejected:       'Zamítnut',
-  draft:          'Koncept',
-  deleted:        'Smazán',
+  pending_review: '_admin_status_pending',
+  published:      '_admin_status_published',
+  rejected:       '_admin_status_rejected',
+  draft:          '_admin_status_draft',
+  deleted:        '_admin_status_deleted',
 }
 
 export function AdminPanel({ onClose }: { onClose: () => void }) {
@@ -56,6 +57,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
   const [acting, setActing] = useState(false)
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
   const [stats, setStats] = useState({ pending: 0, published: 0, rejected: 0, total: 0 })
+  const { t } = useLang()
   const [actionMsg, setActionMsg] = useState<string | null>(null)
 
   useEffect(() => {
@@ -94,7 +96,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
     const { data, error } = await query
 
     if (error) {
-      console.error('Admin fetch error:', error)
+      if (import.meta.env.DEV) console.error('Admin fetch error:', error)
       setListings([])
     } else {
       setListings((data ?? []) as unknown as AdminListing[])
@@ -119,10 +121,10 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
       .eq('id', id)
 
     if (error) {
-      console.error('Approve error:', error)
-      showMsg(`Chyba: ${error.message}`)
+      if (import.meta.env.DEV) console.error('Approve error:', error)
+      showMsg(`${t('_admin_error')}${error.message}`)
     } else {
-      showMsg('✅ Inzerát zveřejněn')
+      showMsg(t('_admin_msg_published'))
       setSelected(null)
       await fetchListings()
     }
@@ -130,16 +132,16 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
   }
 
   const reject = async (id: string) => {
-    if (!rejectReason.trim()) { showMsg('Zadej důvod zamítnutí'); return }
+    if (!rejectReason.trim()) { showMsg(t('_admin_msg_reject_needed')); return }
     setActing(true)
     const { error } = await (supabase.from('listings') as any)
       .update({ status: 'rejected', rejection_reason: rejectReason.trim() })
       .eq('id', id)
 
     if (error) {
-      showMsg(`Chyba: ${error.message}`)
+      showMsg(`${t('_admin_error')}${error.message}`)
     } else {
-      showMsg('❌ Inzerát zamítnut')
+      showMsg(t('_admin_msg_rejected'))
       setSelected(null)
       setRejectReason('')
       await fetchListings()
@@ -148,16 +150,16 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
   }
 
   const deleteL = async (id: string) => {
-    if (!confirm('Opravdu smazat?')) return
+    if (!confirm(t('_admin_confirm_delete'))) return
     setActing(true)
     const { error } = await (supabase.from('listings') as any)
       .update({ status: 'deleted' })
       .eq('id', id)
 
     if (error) {
-      showMsg(`Chyba: ${error.message}`)
+      showMsg(`${t('_admin_error')}${error.message}`)
     } else {
-      showMsg('🗑 Smazáno')
+      showMsg(t('_admin_msg_deleted'))
       setSelected(null)
       await fetchListings()
     }
@@ -166,10 +168,10 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
 
   if (isAdmin === false) return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 70 }}>
-      <div style={{ background: 'white', borderRadius: 12, padding: 32, textAlign: 'center', maxWidth: 320 }}>
+      <div style={{ background: 'var(--c-surface)', borderRadius: 12, padding: 32, textAlign: 'center', maxWidth: 320 }}>
         <div style={{ fontSize: 40, marginBottom: 12 }}>🔒</div>
-        <p style={{ fontSize: 15, marginBottom: 16 }}>Nemáš přístup do admin panelu.</p>
-        <button onClick={onClose} style={{ padding: '8px 20px', border: '1px solid #e2e8f0', borderRadius: 8, background: 'white', cursor: 'pointer' }}>Zavřít</button>
+        <p style={{ fontSize: 15, marginBottom: 16, color: 'var(--c-text)' }}>{t('_admin_no_access')}</p>
+        <button onClick={onClose} style={{ padding: '8px 20px', border: '1px solid var(--c-border)', borderRadius: 8, background: 'var(--c-surface)', cursor: 'pointer', color: 'var(--c-text)' }}>{t('_admin_close')}</button>
       </div>
     </div>
   )
@@ -177,26 +179,26 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
   if (isAdmin === null) return null
 
   const TABS: { key: Tab; label: string; count: number; color: string }[] = [
-    { key: 'pending',   label: 'Čeká na schválení', count: stats.pending,   color: '#f59e0b' },
-    { key: 'published', label: 'Zveřejněné',         count: stats.published, color: '#16a34a' },
-    { key: 'rejected',  label: 'Zamítnuté',           count: stats.rejected,  color: '#dc2626' },
-    { key: 'all',       label: 'Všechny',             count: stats.total,     color: '#64748b' },
+    { key: 'pending',   label: t('_admin_tab_pending'),   count: stats.pending,   color: 'var(--c-yellow)' },
+    { key: 'published', label: t('_admin_tab_published'), count: stats.published, color: 'var(--c-green)' },
+    { key: 'rejected',  label: t('_admin_tab_rejected'),  count: stats.rejected,  color: 'var(--c-red)' },
+    { key: 'all',       label: t('_admin_tab_all'),       count: stats.total,     color: 'var(--c-muted)' },
   ]
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 70, padding: 16 }}>
-      <div style={{ width: '92%', maxWidth: 1100, height: '90vh', background: '#f4f6f8', borderRadius: 16, display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 24px 64px rgba(0,0,0,0.35)' }}>
+      <div style={{ width: '92%', maxWidth: 1100, height: '90vh', background: 'var(--c-bg)', borderRadius: 16, display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 24px 64px rgba(0,0,0,0.35)' }}>
 
         {/* Header */}
-        <div style={{ background: 'white', borderBottom: '1px solid #e2e8f0', padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <div style={{ background: 'var(--c-surface)', borderBottom: '1px solid var(--c-border)', padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-            <span style={{ fontSize: 15, fontWeight: 700, color: '#7c3aed' }}>🛠 Admin panel</span>
+            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--c-accent)' }}>{t('_admin_panel')}</span>
             <div style={{ display: 'flex', gap: 6 }}>
               {TABS.map(t => (
                 <button key={t.key} onClick={() => { setTab(t.key); setSelected(null) }} style={{
                   padding: '5px 12px', borderRadius: 20, border: 'none', cursor: 'pointer',
-                  background: tab === t.key ? t.color : '#f1f5f9',
-                  color: tab === t.key ? 'white' : '#64748b',
+                  background: tab === t.key ? t.color : 'var(--c-bg)',
+                  color: tab === t.key ? 'white' : 'var(--c-muted)',
                   fontSize: 12, fontWeight: tab === t.key ? 600 : 400,
                   transition: 'all 0.15s',
                 }}>
@@ -207,18 +209,18 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {actionMsg && (
-              <span style={{ fontSize: 12, color: '#15803d', background: '#dcfce7', padding: '4px 10px', borderRadius: 6 }}>
+              <span style={{ fontSize: 12, color: 'var(--c-green)', background: 'color-mix(in srgb, var(--c-green) 20%, transparent)', padding: '4px 10px', borderRadius: 6 }}>
                 {actionMsg}
               </span>
             )}
-            <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: '#f1f5f9', cursor: 'pointer', fontSize: 14 }}>✕</button>
+            <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'var(--c-bg)', cursor: 'pointer', fontSize: 14, color: 'var(--c-muted)' }}>✕</button>
           </div>
         </div>
 
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
 
           {/* List */}
-          <div style={{ width: 340, borderRight: '1px solid #e2e8f0', overflow: 'auto', flexShrink: 0, background: 'white' }}>
+          <div style={{ width: 340, borderRight: '1px solid var(--c-border)', overflow: 'auto', flexShrink: 0, background: 'var(--c-surface)' }}>
             {loading && (
               <div style={{ padding: 24, display: 'flex', justifyContent: 'center' }}>
                 <div style={{ width: 20, height: 20, borderRadius: '50%', border: '2px solid #7c3aed', borderTopColor: 'transparent', animation: 'spin 0.7s linear infinite' }} />
@@ -226,36 +228,36 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
             )}
 
             {!loading && listings.length === 0 && (
-              <div style={{ padding: 28, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
-                Žádné inzeráty v této kategorii
+              <div style={{ padding: 28, textAlign: 'center', color: 'var(--c-faint)', fontSize: 13 }}>
+                {t('_admin_empty')}
               </div>
             )}
 
             {!loading && listings.map(l => (
               <div key={l.id} onClick={() => { setSelected(l); setRejectReason('') }} style={{
                 padding: '12px 14px',
-                borderBottom: '1px solid #f1f5f9',
+                borderBottom: '1px solid var(--c-border)',
                 cursor: 'pointer',
-                background: selected?.id === l.id ? '#faf5ff' : 'white',
-                borderLeft: `3px solid ${selected?.id === l.id ? '#7c3aed' : 'transparent'}`,
+                background: selected?.id === l.id ? 'color-mix(in srgb, var(--c-accent) 8%, transparent)' : 'var(--c-surface)',
+                borderLeft: `3px solid ${selected?.id === l.id ? 'var(--c-accent)' : 'transparent'}`,
                 transition: 'all 0.1s',
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--c-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
                     {l.title}
                   </div>
                   <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 10, background: STATUS_COLORS[l.status] + '22', color: STATUS_COLORS[l.status], fontWeight: 600, flexShrink: 0 }}>
-                    {STATUS_LABELS[l.status]}
+                    {t(STATUS_LABELS[l.status])}
                   </span>
                 </div>
-                <div style={{ fontSize: 11, color: '#64748b', marginTop: 3 }}>
+                <div style={{ fontSize: 11, color: 'var(--c-muted)', marginTop: 3 }}>
                   {PROPERTY_TYPE_LABELS[l.property_type as PropertyType]} · {l.area_sqm} m² · {formatPrice(l.price_total_czk)}
                 </div>
-                <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
+                <div style={{ fontSize: 11, color: 'var(--c-faint)', marginTop: 2 }}>
                   {l.address_district} · {formatDate(l.created_at)}
                 </div>
-                <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
-                  👤 {l.owner?.display_name ?? '—'} · {l.owner?.phone || 'bez tel.'}
+                <div style={{ fontSize: 11, color: 'var(--c-muted)', marginTop: 2 }}>
+                  👤 {l.owner?.display_name ?? '—'} · {l.owner?.phone || t('_admin_no_phone')}
                 </div>
               </div>
             ))}
@@ -273,61 +275,61 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
 
               <div>
                 <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>{selected.title}</h2>
-                <p style={{ fontSize: 13, color: '#64748b' }}>
+                <p style={{ fontSize: 13, color: 'var(--c-muted)' }}>
                   {selected.address_street}, {selected.address_district} · {formatPrice(selected.price_total_czk)} · {selected.area_sqm} m²
                 </p>
               </div>
 
-              <div style={{ padding: '12px 14px', background: 'white', borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13, lineHeight: 1.7, maxHeight: 160, overflow: 'auto', color: '#0f172a' }}>
+              <div style={{ padding: '12px 14px', background: 'var(--c-surface)', borderRadius: 8, border: '1px solid var(--c-border)', fontSize: 13, lineHeight: 1.7, maxHeight: 160, overflow: 'auto', color: 'var(--c-text)' }}>
                 {selected.description}
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, fontSize: 12 }}>
                 {[
-                  ['Majitel',   selected.owner?.display_name ?? '—'],
-                  ['Telefon',   selected.owner?.phone || '—'],
-                  ['Dispozice', PROPERTY_TYPE_LABELS[selected.property_type as PropertyType]],
-                  ['Plocha',    `${selected.area_sqm} m²`],
-                  ['Cena',      formatPrice(selected.price_total_czk)],
-                  ['Status',    STATUS_LABELS[selected.status]],
-                  ['Přidáno',   formatDate(selected.created_at)],
-                  ['ID',        selected.id.slice(0, 8) + '...'],
-                  ['Fotky',     `${selected.image_paths.length} ks`],
+                  [t('_admin_detail_owner'),   selected.owner?.display_name ?? '—'],
+                  [t('_admin_detail_phone'),   selected.owner?.phone || '—'],
+                  [t('_admin_detail_type'),    PROPERTY_TYPE_LABELS[selected.property_type as PropertyType]],
+                  [t('_admin_detail_area'),    `${selected.area_sqm} m²`],
+                  [t('_admin_detail_price'),   formatPrice(selected.price_total_czk)],
+                  [t('_admin_detail_status'),  t(STATUS_LABELS[selected.status])],
+                  [t('_admin_detail_added'),   formatDate(selected.created_at)],
+                  [t('_admin_detail_id'),      selected.id.slice(0, 8) + '...'],
+                  [t('_admin_detail_photos'),  `${selected.image_paths.length} ks`],
                 ].map(([k, v]) => (
-                  <div key={k} style={{ padding: '8px 10px', background: 'white', borderRadius: 6, border: '1px solid #e2e8f0' }}>
-                    <div style={{ color: '#94a3b8', marginBottom: 2, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{k}</div>
-                    <div style={{ fontWeight: 500, color: '#0f172a' }}>{v}</div>
+                  <div key={k} style={{ padding: '8px 10px', background: 'var(--c-surface)', borderRadius: 6, border: '1px solid var(--c-border)' }}>
+                    <div style={{ color: 'var(--c-faint)', marginBottom: 2, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{k}</div>
+                    <div style={{ fontWeight: 500, color: 'var(--c-text)' }}>{v}</div>
                   </div>
                 ))}
               </div>
 
               {/* Actions */}
-              <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ borderTop: '1px solid var(--c-border)', paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
 
                 {(selected.status === 'pending_review' || selected.status === 'rejected') && (
                   <button
                     onClick={() => approve(selected.id)}
                     disabled={acting}
-                    style={{ padding: '11px 0', background: acting ? '#86efac' : '#16a34a', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: acting ? 'not-allowed' : 'pointer' }}
+                    style={{ padding: '11px 0', background: acting ? 'color-mix(in srgb, var(--c-green) 60%, transparent)' : 'var(--c-green)', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: acting ? 'not-allowed' : 'pointer' }}
                   >
-                    {acting ? 'Zpracovávám...' : '✅ Schválit a zveřejnit'}
+                    {acting ? t('_admin_approve_acting') : t('_admin_approve')}
                   </button>
                 )}
 
                 {selected.status !== 'rejected' && selected.status !== 'deleted' && (
                   <div style={{ display: 'flex', gap: 8 }}>
                     <input
-                      placeholder="Důvod zamítnutí (povinné)..."
+                      placeholder={t('_admin_reject_label')}
                       value={rejectReason}
                       onChange={e => setRejectReason(e.target.value)}
-                      style={{ flex: 1, padding: '9px 11px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, outline: 'none' }}
+                      style={{ flex: 1, padding: '9px 11px', border: '1px solid var(--c-border)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'var(--c-surface)', color: 'var(--c-text)' }}
                     />
                     <button
                       onClick={() => reject(selected.id)}
                       disabled={acting || !rejectReason.trim()}
-                      style={{ padding: '9px 16px', background: '#dc2626', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: acting ? 'not-allowed' : 'pointer', opacity: !rejectReason.trim() ? 0.5 : 1 }}
+                      style={{ padding: '9px 16px', background: 'var(--c-red)', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: acting ? 'not-allowed' : 'pointer', opacity: !rejectReason.trim() ? 0.5 : 1 }}
                     >
-                      Zamítnout
+                      {t('_admin_reject')}
                     </button>
                   </div>
                 )}
@@ -336,25 +338,25 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
                   <button
                     onClick={() => reject(selected.id)}
                     disabled={acting}
-                    style={{ padding: '9px 0', background: '#f59e0b', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
+                    style={{ padding: '9px 0', background: 'var(--c-yellow)', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
                   >
-                    ⏸ Stáhnout z nabídky
+                    {t('_admin_unpublish')}
                   </button>
                 )}
 
                 <button
                   onClick={() => deleteL(selected.id)}
                   disabled={acting}
-                  style={{ padding: '9px 0', background: 'transparent', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: 8, fontSize: 13, cursor: 'pointer' }}
+                  style={{ padding: '9px 0', background: 'transparent', color: 'var(--c-red)', border: '1px solid color-mix(in srgb, var(--c-red) 40%, transparent)', borderRadius: 8, fontSize: 13, cursor: 'pointer' }}
                 >
-                  🗑 Trvale smazat
+                  {t('_admin_delete')}
                 </button>
               </div>
             </div>
           ) : (
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 14, flexDirection: 'column', gap: 8 }}>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--c-faint)', fontSize: 14, flexDirection: 'column', gap: 8 }}>
               <span style={{ fontSize: 32 }}>👈</span>
-              Vyber inzerát ze seznamu
+              {t('_admin_select_prompt')}
             </div>
           )}
         </div>
