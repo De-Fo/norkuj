@@ -79,7 +79,7 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
     const doFetch = async () => {
       let { data, error } = await (supabase
         .from('listings') as any)
-        .select('*, owner:profiles(display_name, phone, email, avatar_url)')
+        .select('*')
         .eq('id', listingId)
         .maybeSingle()
 
@@ -96,6 +96,12 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
         setLoading(false)
         return
       }
+
+      // Fetch owner info via SECURITY DEFINER RPC instead of direct profiles join
+      const { data: ownerData } = await supabase.rpc('get_listing_owner_info', {
+        listing_id: listingId,
+      }) as any
+      ;(data as any).owner = ownerData?.[0] ?? null
 
       setListing(data as FullListing)
       setLoading(false)
