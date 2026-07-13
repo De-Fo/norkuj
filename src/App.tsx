@@ -17,8 +17,6 @@ import { CookieConsent } from './components/CookieConsent'
 import { FeatureTour, isFirstVisit, markTourSeen } from './components/FeatureTour'
 import { getImageUrl } from './lib/utils'
 
-const ADMIN_UIDS = (import.meta.env.VITE_ADMIN_UIDS ?? '').split(',').map((s: string) => s.trim()).filter(Boolean)
-
 type Theme = 'light' | 'dark'
 type Route = 'search' | 'auth' | 'profile' | 'my-listings' | 'favorites'
 
@@ -52,6 +50,7 @@ export default function App() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
   const [favoritesIds, setFavoritesIds] = useState<Set<string>>(new Set())
   const [tourOpen, setTourOpen] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
   const { t, lang, setLang } = useLang()
 
   // ── Theme ──
@@ -122,7 +121,8 @@ export default function App() {
 
   // ── Auth ──
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(({ data, error }) => {
+      if (error && import.meta.env.DEV) console.error('[auth session]', error)
       setUser(data.session?.user ?? null)
       setAuthLoading(false)
     })
@@ -143,9 +143,22 @@ export default function App() {
 
   // ── Favorites ──
   useEffect(() => {
-    if (!user) { setFavoritesIds(new Set()); return }
+    if (!user) { setFavoritesIds(new Set()); setIsAdmin(false); return }
     supabase.from('favorites').select('listing_id').eq('user_id', user.id)
-      .then(({ data }) => setFavoritesIds(new Set((data ?? []).map((r: any) => r.listing_id))))
+      .then(({ data, error }) => {
+        if (error && import.meta.env.DEV) console.error('[favorites fetch]', error)
+        setFavoritesIds(new Set((data ?? []).map((r: any) => r.listing_id)))
+      })
+  }, [user])
+
+  // ── Admin check via profiles.is_admin ──
+  useEffect(() => {
+    if (!user) { setIsAdmin(false); return }
+    (supabase.from('profiles') as any).select('is_admin').eq('id', user.id).maybeSingle()
+      .then(({ data, error }: any) => {
+        if (error && import.meta.env.DEV) console.error('[admin check]', error)
+        setIsAdmin(data?.is_admin === true)
+      })
   }, [user])
 
   const toggleFavorite = async (listingId: string) => {
@@ -183,8 +196,6 @@ export default function App() {
 
   if (route === 'auth') return <AuthPage onBack={() => setRoute('search')} />
   if (route === 'profile') return <ProfilePage user={user} onBack={() => setRoute('search')} />
-
-  const isAdmin = user ? ADMIN_UIDS.includes(user.id) : false
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden' }}>
@@ -453,7 +464,8 @@ function FavoritesPage({ listingIds, onSelectListing, onBack }: {
     setLoading(true)
     supabase.from('listings').select('id, title, price_total_czk, property_type, area_sqm, address_district, available_from, image_paths')
       .in('id', listingIds)
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error && import.meta.env.DEV) console.error('[favorites listings]', error)
         setListings(data ?? [])
         setLoading(false)
       })

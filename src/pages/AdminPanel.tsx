@@ -3,8 +3,7 @@ import { supabase } from '../lib/supabase'
 import { PROPERTY_TYPE_LABELS, type PropertyType } from '../lib/types'
 import { formatPrice, formatDate, getImageUrl } from '../lib/utils'
 import { useLang } from '../lib/lang'
-
-const ADMIN_UIDS = (import.meta.env.VITE_ADMIN_UIDS ?? '').split(',').map((s: string) => s.trim()).filter(Boolean)
+import { mapError } from '../lib/errors'
 
 interface AdminListing {
   id: string
@@ -61,8 +60,14 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
   const [actionMsg, setActionMsg] = useState<string | null>(null)
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setIsAdmin(data.user ? ADMIN_UIDS.includes(data.user.id) : false)
+    supabase.auth.getUser().then(({ data, error }) => {
+      if (error && import.meta.env.DEV) console.error('[admin getUser]', error)
+      if (!data.user) { setIsAdmin(false); return }
+      supabase.from('profiles').select('is_admin').eq('id', data.user.id).maybeSingle()
+        .then(({ data: profile, error: pErr }: any) => {
+          if (pErr && import.meta.env.DEV) console.error('[admin profile check]', pErr)
+          setIsAdmin(profile?.is_admin === true)
+        })
     })
   }, [])
 
@@ -122,7 +127,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
 
     if (error) {
       if (import.meta.env.DEV) console.error('Approve error:', error)
-      showMsg(`${t('_admin_error')}${error.message}`)
+      showMsg(mapError(error, t))
     } else {
       showMsg(t('_admin_msg_published'))
       setSelected(null)
@@ -139,7 +144,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
       .eq('id', id)
 
     if (error) {
-      showMsg(`${t('_admin_error')}${error.message}`)
+      showMsg(mapError(error, t))
     } else {
       showMsg(t('_admin_msg_rejected'))
       setSelected(null)
@@ -155,9 +160,8 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
     const { error } = await (supabase.from('listings') as any)
       .update({ status: 'deleted' })
       .eq('id', id)
-
     if (error) {
-      showMsg(`${t('_admin_error')}${error.message}`)
+      showMsg(mapError(error, t))
     } else {
       showMsg(t('_admin_msg_deleted'))
       setSelected(null)

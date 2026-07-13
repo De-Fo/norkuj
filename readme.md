@@ -150,9 +150,7 @@ Performance: ~34 ms (10 min) to ~2.5 s (60 min). Loading state is shown during c
 VITE_SUPABASE_URL          # https://[project].supabase.co
 VITE_SUPABASE_ANON_KEY     # Anon/publishable key (NOT service_role)
 VITE_MAPTILER_KEY          # MapTiler API key
-VITE_ADMIN_UIDS            # Comma-separated admin UIDs (legacy fallback)
-VITE_GOLEMIO_API_KEY       # Golemio API key (optional, for future realtime features)
-```
+/```
 
 ---
 

@@ -29,6 +29,50 @@ export function getImageUrl(path: string): string {
   return `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/listing-images/${path}`
 }
 
+/**
+ * Compress an image file client-side before upload.
+ * Resizes to max 1920px on the longest side, JPEG quality 0.8.
+ */
+export function compressImage(file: File, maxDimension = 1920, quality = 0.8): Promise<File> {
+  return new Promise((resolve, reject) => {
+    // Skip non-image files or already-small images (no compression needed for <1MB)
+    if (!file.type.startsWith('image/') || file.size < 1_000_000) {
+      resolve(file)
+      return
+    }
+
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      let { width, height } = img
+      if (width <= maxDimension && height <= maxDimension && file.size < 5_000_000) {
+        resolve(file)
+        return
+      }
+      // Scale down
+      if (width > maxDimension || height > maxDimension) {
+        const ratio = Math.min(maxDimension / width, maxDimension / height)
+        width = Math.round(width * ratio)
+        height = Math.round(height * ratio)
+      }
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')
+      if (!ctx) { resolve(file); return }
+      ctx.drawImage(img, 0, 0, width, height)
+      canvas.toBlob((blob) => {
+        if (!blob) { resolve(file); return }
+        const compressed = new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' })
+        resolve(compressed)
+      }, 'image/jpeg', quality)
+    }
+    img.onerror = () => reject(new Error('Image load failed'))
+    img.src = url
+  })
+}
+
 export function activeFilterCount(filters: import('./types').SearchFilters): number {
   return (
     filters.transitLines.length +

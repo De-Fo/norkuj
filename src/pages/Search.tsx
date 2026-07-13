@@ -75,7 +75,10 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
             p_max_price: 0,           // no price filtering in RPC — done client-side
             p_property_type: null,     // no type filtering in RPC — done client-side
             p_bbox: null,              // no bbox filtering in RPC — done client-side
-          }).then((r: any) => r.data ?? [])
+          }).then((r: any) => {
+            if (r.error && import.meta.env.DEV) console.error('[transit search]', r.error)
+            return r.data ?? []
+          })
         )
       )
 

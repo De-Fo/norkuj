@@ -6,6 +6,8 @@ import { DISTRICT_GROUPS, suggestDistricts, ALL_DISTRICTS, findDistrictsForPoint
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useLang } from '../lib/lang'
+import { compressImage } from '../lib/utils'
+import { mapError } from '../lib/errors'
 
 const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY
 
@@ -111,14 +113,18 @@ export function CreateListingPage({ onDone, editListing }: Props) {
   const stepValid = (s: number): boolean => {
     const f = form
     switch (s) {
-      case 0: return !!(f.title.trim().length >= 3 && f.description.trim().length >= 10 && f.property_type && f.area_sqm && f.available_from)
-      case 1: return !!f.price_czk
+      case 0: return !!(f.title.trim().length >= 10 && f.title.trim().length <= 120 && f.description.trim().length >= 20 && f.description.trim().length <= 5000 && f.property_type && parseInt(f.area_sqm) >= 10 && parseInt(f.area_sqm) <= 1000 && f.available_from)
+      case 1: return !!f.price_czk && parseInt(f.price_czk) > 0
       case 2: return !!(f.address_street.trim().length >= 3 && f.lat != null && f.lng != null)
-      case 3: return true // images are optional
+      case 3: {
+        const existing = isEdit ? (editListing!.image_paths ?? []).length : 0
+        return existing + form.images.length > 0
+      }
+      case 4: return true
       default: return true
     }
   }
-  const allValid = stepValid(0) && stepValid(1) && stepValid(2)
+  const allValid = stepValid(0) && stepValid(1) && stepValid(2) && stepValid(3)
   const [confirmClose, setConfirmClose] = useState(false)
   const [districtSuggestions, setDistrictSuggestions] = useState<string[]>([])
   const mapInstance = useRef<maplibregl.Map | null>(null)
@@ -174,9 +180,24 @@ export function CreateListingPage({ onDone, editListing }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step])
 
-  const handleImages = (files: FileList | null) => {
+  const handleImages = async (files: FileList | null) => {
     if (!files) return
-    set({ images: [...form.images, ...Array.from(files)].slice(0, 20) })
+    setError(null)
+    const MAX_SIZE_BYTES = 10 * 1024 * 1024 // 10 MB per file
+    const validFiles: File[] = []
+    for (const file of Array.from(files)) {
+      if (file.size > MAX_SIZE_BYTES) {
+        setError(t('_create_photos_too_large'))
+        continue
+      }
+      try {
+        const compressed = await compressImage(file)
+        validFiles.push(compressed)
+      } catch {
+        validFiles.push(file) // fallback: use original if compression fails
+      }
+    }
+    set({ images: [...form.images, ...validFiles].slice(0, 20) })
   }
 
   const handleSubmit = async () => {
@@ -186,7 +207,13 @@ export function CreateListingPage({ onDone, editListing }: Props) {
       if (!user) throw new Error(t('_create_error_auth'))
       if (!form.lat || !form.lng) throw new Error(t('_create_error_location'))
 
-      const imagePaths: string[] = isEdit ? [...(editListing!.image_paths ?? [])] : []
+      const existingPaths: string[] = isEdit ? [...(editListing!.image_paths ?? [])] : []
+      const totalImageCount = existingPaths.length + form.images.length
+      if (totalImageCount === 0) {
+        throw new Error(t('_create_photos_required'))
+      }
+
+      const imagePaths: string[] = [...existingPaths]
       for (const file of form.images) {
         const path = `${user.id}/${Date.now()}_${file.name.replace(/\s+/g, '_')}`
         const { error: upErr } = await supabase.storage.from('listing-images').upload(path, file)
@@ -241,8 +268,8 @@ export function CreateListingPage({ onDone, editListing }: Props) {
       }
 
       setSuccess(true)
-    } catch (e: any) {
-      setError(e.message ?? t('_create_error_save'))
+    } catch (e: unknown) {
+      setError(mapError(e, t))
     }
     setUploading(false)
   }
@@ -511,6 +538,14 @@ export function CreateListingPage({ onDone, editListing }: Props) {
                         {t('_create_photos_hint')}
                         <input type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={e => handleImages(e.target.files)} />
                       </label>
+                      {isEdit && (editListing!.image_paths ?? []).length > 0 && (
+                        <p style={{ fontSize: 11, color: 'var(--c-muted)', marginTop: 4 }}>
+                          {t('_create_photos_existing')}: {(editListing!.image_paths ?? []).length}
+                        </p>
+                      )}
+                      {form.images.length === 0 && (editListing?.image_paths ?? []).length + form.images.length === 0 && (
+                        <p style={{ fontSize: 11, color: 'var(--c-red)', marginTop: 4 }}>{t('_create_photos_required')}</p>
+                      )}
                     </div>
                     {form.images.length > 0 && (
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { Wordmark } from '../components/Wordmark'
 import { useLang } from '../lib/lang'
+import { mapError } from '../lib/errors'
 
 type Mode = 'login' | 'register' | 'reset'
 
@@ -45,7 +46,7 @@ export function AuthPage({ onBack }: Props) {
         password,
         options: { data: { display_name: displayName, phone } },
       })
-      if (error) { setMsg({ ok: false, text: error.message }); setLoading(false); return }
+      if (error) { setMsg({ ok: false, text: mapError(error, t) }); setLoading(false); return }
       if (data?.user) {
         await supabase.from('profiles').upsert(
           [{ id: data.user.id, display_name: displayName, phone, email }] as any,
@@ -55,13 +56,13 @@ export function AuthPage({ onBack }: Props) {
       }
     } else if (mode === 'login') {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) setMsg({ ok: false, text: t('_auth_error_invalid') })
+      if (error) setMsg({ ok: false, text: mapError(error, t) })
     } else if (mode === 'reset') {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: window.location.origin + window.location.pathname,
       })
       setMsg(error
-        ? { ok: false, text: error.message }
+        ? { ok: false, text: mapError(error, t) }
         : { ok: true, text: t('_auth_reset_sent') })
     }
     setLoading(false)
@@ -71,7 +72,7 @@ export function AuthPage({ onBack }: Props) {
     setLoading(true); setMsg(null)
     const { error } = await supabase.auth.updateUser({ password: newPassword })
     setLoading(false)
-    if (error) { setMsg({ ok: false, text: error.message }); return }
+    if (error) { setMsg({ ok: false, text: mapError(error, t) }); return }
     setMsg({ ok: true, text: t('_auth_password_changed') })
     setTimeout(() => {
       window.location.hash = ''

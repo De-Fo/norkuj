@@ -77,7 +77,6 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
     setShowContact(false)
 
     const doFetch = async () => {
-      // First try: fetch as published (public)
       let { data, error } = await (supabase
         .from('listings') as any)
         .select('*, owner:profiles(display_name, phone, email, avatar_url)')
@@ -86,14 +85,14 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
 
       if (error) {
         if (import.meta.env.DEV) console.error('[ListingDetail] fetch error:', error)
-        setErrorMsg('Inzerát nebyl nalezen nebo není zveřejněn.')
+        setErrorMsg(t('_detail_not_found'))
         setLoading(false)
         return
       }
 
       if (!data) {
         if (import.meta.env.DEV) console.warn('[ListingDetail] no data returned for id:', listingId)
-        setErrorMsg('Inzerát nebyl nalezen nebo není zveřejněn.')
+        setErrorMsg(t('_detail_not_found'))
         setLoading(false)
         return
       }

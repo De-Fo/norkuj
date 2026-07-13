@@ -5,6 +5,7 @@ import type { Listing, ListingStatus } from '../lib/types'
 import { PROPERTY_TYPE_LABELS } from '../lib/types'
 import { formatPrice, formatDate, getImageUrl } from '../lib/utils'
 import { useLang } from '../lib/lang'
+import { mapError } from '../lib/errors'
 
 interface Props {
   user: User | null
@@ -54,14 +55,16 @@ export function MyListingsPage({ user, onBack, onEdit }: Props) {
   const handleDelete = async (id: string) => {
     if (!confirm(t('_mylistings_confirm_delete'))) return
     setBusyId(id)
-    await (supabase.from('listings') as any).update({ status: 'deleted' }).eq('id', id)
+    const { error } = await (supabase.from('listings') as any).update({ status: 'deleted' }).eq('id', id)
+    if (error) { alert(mapError(error, t)); setBusyId(null); return }
     setBusyId(null)
     load()
   }
 
   const handleMarkRented = async (id: string) => {
     setBusyId(id)
-    await (supabase.from('listings') as any).update({ status: 'rented' }).eq('id', id)
+    const { error } = await (supabase.from('listings') as any).update({ status: 'rented' }).eq('id', id)
+    if (error) { alert(mapError(error, t)); setBusyId(null); return }
     setBusyId(null)
     load()
   }
