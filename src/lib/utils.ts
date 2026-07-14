@@ -30,6 +30,29 @@ export function getImageUrl(path: string): string {
 }
 
 /**
+ * Convert a HEIC/HEIF file to JPEG using heic2any.
+ * Returns the original file unchanged if it's not HEIC/HEIF.
+ */
+export async function convertHeicToJpeg(file: File): Promise<File> {
+  const isHeic =
+    /\.(heic|heif)$/i.test(file.name) ||
+    file.type === 'image/heic' ||
+    file.type === 'image/heif' ||
+    file.type === 'image/heic-sequence' ||
+    file.type === 'image/heif-sequence'
+  if (!isHeic) return file
+
+  const heic2any = (await import('heic2any')).default
+  const blob = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.8 })
+  const resultBlob = Array.isArray(blob) ? blob[0] : blob
+  return new File(
+    [resultBlob],
+    file.name.replace(/\.(heic|heif)$/i, '.jpg'),
+    { type: 'image/jpeg' },
+  )
+}
+
+/**
  * Compress an image file client-side before upload.
  * Resizes to max 1920px on the longest side, JPEG quality 0.8.
  */

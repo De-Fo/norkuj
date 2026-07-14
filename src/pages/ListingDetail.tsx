@@ -181,7 +181,7 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
 
         {/* Share button */}
         <button onClick={handleShare}
-          title={t('_detail_share')}
+          title={t('_detail_share')} aria-label={t('_detail_share')}
           style={{
             position: 'absolute', top: 12, right: 102, zIndex: 10,
             width: 32, height: 32, borderRadius: '50%', border: 'none',
@@ -196,6 +196,7 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
         {/* Favorite star */}
         {onToggleFavorite && propUser && (
           <button onClick={() => onToggleFavorite(listingId)}
+            aria-label={isFavorited ? 'Odebrat z oblíbených' : 'Přidat do oblíbených'}
             style={{
               position: 'absolute', top: 12, right: 56, zIndex: 10,
               width: 32, height: 32, borderRadius: '50%', border: 'none',
@@ -210,7 +211,7 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
           </button>
         )}
 
-        <button onClick={onClose} style={{ position: 'absolute', top: 12, right: 12, zIndex: 10, width: 32, height: 32, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.45)', color: 'white', fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+        <button onClick={onClose} aria-label={t('_detail_close')} style={{ position: 'absolute', top: 12, right: 12, zIndex: 10, width: 32, height: 32, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.45)', color: 'white', fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
 
         {loading && (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>

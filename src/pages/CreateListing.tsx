@@ -6,7 +6,7 @@ import { DISTRICT_GROUPS, suggestDistricts, ALL_DISTRICTS, findDistrictsForPoint
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useLang } from '../lib/lang'
-import { compressImage } from '../lib/utils'
+import { compressImage, convertHeicToJpeg, getImageUrl } from '../lib/utils'
 import { mapError } from '../lib/errors'
 
 const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY
@@ -106,6 +106,8 @@ export function CreateListingPage({ onDone, editListing }: Props) {
   const { t } = useLang()
   const isEdit = !!editListing
   const [uploading, setUploading] = useState(false)
+  const [convertingHeic, setConvertingHeic] = useState(false)
+  const [removedExistingPaths, setRemovedExistingPaths] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
 
@@ -117,8 +119,10 @@ export function CreateListingPage({ onDone, editListing }: Props) {
       case 1: return !!f.price_czk && parseInt(f.price_czk) > 0
       case 2: return !!(f.address_street.trim().length >= 3 && f.lat != null && f.lng != null)
       case 3: {
-        const existing = isEdit ? (editListing!.image_paths ?? []).length : 0
-        return existing + form.images.length > 0
+        const existingCount = isEdit
+          ? (editListing!.image_paths ?? []).filter(p => !removedExistingPaths.has(p)).length
+          : 0
+        return existingCount + form.images.length > 0
       }
       case 4: return true
       default: return true
@@ -190,11 +194,26 @@ export function CreateListingPage({ onDone, editListing }: Props) {
         setError(t('_create_photos_too_large'))
         continue
       }
+      // Convert HEIC to JPEG so it works in all browsers
+      const isHeic = /\.(heic|heif)$/i.test(file.name) || ['image/heic','image/heif','image/heic-sequence','image/heif-sequence'].includes(file.type)
+      let readyFile = file
+      if (isHeic) {
+        setConvertingHeic(true)
+        try {
+          readyFile = await convertHeicToJpeg(file)
+        } catch (e) {
+          // conversion failed – skip this file, don't block the rest
+          if (import.meta.env.DEV) console.error('[heic conversion]', e)
+          setConvertingHeic(false)
+          continue
+        }
+        setConvertingHeic(false)
+      }
       try {
-        const compressed = await compressImage(file)
+        const compressed = await compressImage(readyFile)
         validFiles.push(compressed)
       } catch {
-        validFiles.push(file) // fallback: use original if compression fails
+        validFiles.push(readyFile) // fallback: use the (possibly converted) original
       }
     }
     set({ images: [...form.images, ...validFiles].slice(0, 20) })
@@ -207,10 +226,17 @@ export function CreateListingPage({ onDone, editListing }: Props) {
       if (!user) throw new Error(t('_create_error_auth'))
       if (!form.lat || !form.lng) throw new Error(t('_create_error_location'))
 
-      const existingPaths: string[] = isEdit ? [...(editListing!.image_paths ?? [])] : []
+      const existingPaths: string[] = isEdit
+        ? (editListing!.image_paths ?? []).filter(p => !removedExistingPaths.has(p))
+        : []
       const totalImageCount = existingPaths.length + form.images.length
       if (totalImageCount === 0) {
         throw new Error(t('_create_photos_required'))
+      }
+
+      // Delete removed images from storage
+      if (isEdit && removedExistingPaths.size > 0) {
+        await supabase.storage.from('listing-images').remove(Array.from(removedExistingPaths))
       }
 
       const imagePaths: string[] = [...existingPaths]
@@ -293,7 +319,7 @@ export function CreateListingPage({ onDone, editListing }: Props) {
         boxShadow: '0 20px 60px rgba(0,0,0,0.3)', position: 'relative',
       }}>
 
-        <button onClick={requestClose} style={{
+        <button onClick={requestClose} aria-label={t('_create_nav_cancel')} style={{
           position: 'absolute', top: 14, right: 14, zIndex: 5,
           width: 28, height: 28, borderRadius: '50%', border: 'none',
           background: 'var(--c-bg)', color: 'var(--c-muted)', fontSize: 14,
@@ -535,24 +561,76 @@ export function CreateListingPage({ onDone, editListing }: Props) {
                         cursor: 'pointer', color: 'var(--c-muted)', fontSize: 13, gap: 6,
                       }}>
                         <span style={{ fontSize: 28 }}>📷</span>
-                        {t('_create_photos_hint')}
-                        <input type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={e => handleImages(e.target.files)} />
+                        {convertingHeic ? t('_create_photos_converting') : t('_create_photos_hint')}
+                        <input type="file" accept="image/*" multiple style={{ display: 'none' }} disabled={convertingHeic} onChange={e => handleImages(e.target.files)} />
                       </label>
+
+                      {/* Existing photos (edit mode) — with remove buttons */}
                       {isEdit && (editListing!.image_paths ?? []).length > 0 && (
-                        <p style={{ fontSize: 11, color: 'var(--c-muted)', marginTop: 4 }}>
-                          {t('_create_photos_existing')}: {(editListing!.image_paths ?? []).length}
+                        <>
+                          <p style={{ fontSize: 11, color: 'var(--c-muted)', marginTop: 4 }}>
+                            {t('_create_photos_existing')} ({(editListing!.image_paths ?? []).filter(p => !removedExistingPaths.has(p)).length})
+                          </p>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                            {(editListing!.image_paths ?? []).map((path: string) => {
+                              const isRemoved = removedExistingPaths.has(path)
+                              if (isRemoved) return null
+                              return (
+                                <div key={path} style={{ position: 'relative' }}>
+                                  <img src={getImageUrl(path)} alt={t('_create_photos_existing')}
+                                    style={{ width: '100%', height: 80, objectFit: 'cover', borderRadius: 8 }} />
+                                  <button aria-label={t('_create_photos_remove')} onClick={() => {
+                                    if ((editListing!.image_paths ?? []).filter(p => !removedExistingPaths.has(p)).length <= 1) {
+                                      const keep = confirm(t('_create_photos_last_confirm'))
+                                      if (!keep) return
+                                    }
+                                    setRemovedExistingPaths(prev => new Set(prev).add(path))
+                                  }} style={{
+                                    position: 'absolute', top: 3, right: 3, width: 18, height: 18,
+                                    borderRadius: '50%', border: 'none', background: 'rgba(220,38,38,0.85)',
+                                    color: 'white', fontSize: 10, cursor: 'pointer',
+                                  }}>✕</button>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </>
+                      )}
+
+                      {/* Removed photos placeholder */}
+                      {isEdit && removedExistingPaths.size > 0 && (
+                        <p style={{ fontSize: 11, color: 'var(--c-faint)', marginTop: -8 }}>
+                          {removedExistingPaths.size} {t('_create_photos_removed')}
+                          <button onClick={() => setRemovedExistingPaths(new Set())}
+                            style={{
+                              marginLeft: 8, padding: '1px 6px', border: '1px solid var(--c-border)',
+                              borderRadius: 6, background: 'transparent', color: 'var(--c-muted)',
+                              fontSize: 10, cursor: 'pointer',
+                            }}>
+                            {t('_create_photos_undo_removed')}
+                          </button>
                         </p>
                       )}
-                      {form.images.length === 0 && (editListing?.image_paths ?? []).length + form.images.length === 0 && (
-                        <p style={{ fontSize: 11, color: 'var(--c-red)', marginTop: 4 }}>{t('_create_photos_required')}</p>
-                      )}
+
+                      {/* Validation */}
+                      {(() => {
+                        const existingCount = isEdit
+                          ? (editListing!.image_paths ?? []).filter(p => !removedExistingPaths.has(p)).length
+                          : 0
+                        if (existingCount + form.images.length === 0) {
+                          return <p style={{ fontSize: 11, color: 'var(--c-red)', marginTop: 4 }}>{t('_create_photos_required')}</p>
+                        }
+                        return null
+                      })()}
                     </div>
+
+                    {/* New photos preview */}
                     {form.images.length > 0 && (
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
                         {form.images.map((f, i) => (
                           <div key={i} style={{ position: 'relative' }}>
                             <img src={URL.createObjectURL(f)} alt="" style={{ width: '100%', height: 80, objectFit: 'cover', borderRadius: 8 }} />
-                            <button onClick={() => set({ images: form.images.filter((_, j) => j !== i) })} style={{
+                            <button aria-label={t('_create_photos_remove')} onClick={() => set({ images: form.images.filter((_, j) => j !== i) })} style={{
                               position: 'absolute', top: 3, right: 3, width: 18, height: 18,
                               borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.6)',
                               color: 'white', fontSize: 10, cursor: 'pointer',

@@ -57,6 +57,13 @@ export function MyListingsPage({ user, onBack, onEdit }: Props) {
     setBusyId(id)
     const { error } = await (supabase.from('listings') as any).update({ status: 'deleted' }).eq('id', id)
     if (error) { alert(mapError(error, t)); setBusyId(null); return }
+    // Fire-and-forget: notify owner
+    supabase.functions.invoke('send-listing-email', {
+      method: 'POST',
+      body: { listingId: id, eventType: 'deleted' },
+    }).catch((e: unknown) => {
+      if (import.meta.env.DEV) console.error('[email notify]', e)
+    })
     setBusyId(null)
     load()
   }

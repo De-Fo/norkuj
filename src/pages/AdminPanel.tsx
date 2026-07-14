@@ -121,49 +121,129 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
 
   const approve = async (id: string) => {
     setActing(true)
-    const { error } = await (supabase.from('listings') as any)
+    const { data, error } = await (supabase.from('listings') as any)
       .update({ status: 'published', published_at: new Date().toISOString() })
       .eq('id', id)
+      .select()
 
-    if (error) {
-      if (import.meta.env.DEV) console.error('Approve error:', error)
-      showMsg(mapError(error, t))
-    } else {
-      showMsg(t('_admin_msg_published'))
-      setSelected(null)
-      await fetchListings()
+    if (error || !data || data.length === 0) {
+      if (import.meta.env.DEV) console.error('Approve error or no rows affected:', error, data)
+      showMsg(error ? mapError(error, t) : (t('_admin_error') + 'Oprávnění zamítnuto — žádný řádek nebyl aktualizován'))
+      setActing(false)
+      return
     }
+    // Fire-and-forget: notify owner
+    supabase.functions.invoke('send-listing-email', {
+      method: 'POST',
+      body: { listingId: id, eventType: 'published' },
+    }).catch((e: unknown) => {
+      if (import.meta.env.DEV) console.error('[email notify]', e)
+    })
+    showMsg(t('_admin_msg_published'))
+    setSelected(null)
     setActing(false)
+    await fetchListings()
   }
 
   const reject = async (id: string) => {
     if (!rejectReason.trim()) { showMsg(t('_admin_msg_reject_needed')); return }
     setActing(true)
-    const { error } = await (supabase.from('listings') as any)
+    const { data, error } = await (supabase.from('listings') as any)
       .update({ status: 'rejected', rejection_reason: rejectReason.trim() })
       .eq('id', id)
+      .select()
 
+    if (error || !data || data.length === 0) {
+      if (import.meta.env.DEV) console.error('Reject error or no rows affected:', error, data)
+      showMsg(error ? mapError(error, t) : (t('_admin_error') + 'Oprávnění zamítnuto — žádný řádek nebyl aktualizován'))
+      setActing(false)
+      return
+    }
+    // Fire-and-forget: notify owner with rejection reason
+    supabase.functions.invoke('send-listing-email', {
+      method: 'POST',
+      body: { listingId: id, eventType: 'rejected', reason: rejectReason.trim() },
+    }).catch((e: unknown) => {
+      if (import.meta.env.DEV) console.error('[rejection email]', e)
+    })
+    showMsg(t('_admin_msg_rejected'))
+    setSelected(null)
+    setRejectReason('')
+    setActing(false)
+    await fetchListings()
+  }
+
+  const deleteL = async (id: string) => {
+    // "Smazat trvale" — hard DELETE, no email, owner already notified by prior step
+    if (!confirm(t('_admin_confirm_delete'))) return
+    setActing(true)
+
+    // First grab image paths so we can clean up storage
+    const { data: listing } = await (supabase.from('listings') as any)
+      .select('image_paths')
+      .eq('id', id)
+      .single()
+
+    if (listing?.image_paths?.length > 0) {
+      await supabase.storage.from('listing-images').remove(listing.image_paths).catch(() => {})
+    }
+
+    const { error } = await supabase.from('listings').delete().eq('id', id) as any
     if (error) {
+      if (import.meta.env.DEV) console.error('Hard delete error:', error)
       showMsg(mapError(error, t))
     } else {
-      showMsg(t('_admin_msg_rejected'))
+      showMsg(t('_admin_msg_deleted'))
       setSelected(null)
-      setRejectReason('')
       await fetchListings()
     }
     setActing(false)
   }
 
-  const deleteL = async (id: string) => {
-    if (!confirm(t('_admin_confirm_delete'))) return
+  const republishL = async (id: string) => {
+    if (!confirm(t('_admin_republish_confirm'))) return
     setActing(true)
-    const { error } = await (supabase.from('listings') as any)
-      .update({ status: 'deleted' })
+    const { data, error } = await (supabase.from('listings') as any)
+      .update({ status: 'published', published_at: new Date().toISOString(), rejection_reason: null })
       .eq('id', id)
-    if (error) {
-      showMsg(mapError(error, t))
+      .select()
+    if (error || !data || data.length === 0) {
+      if (import.meta.env.DEV) console.error('Republish error:', error, data)
+      showMsg(error ? mapError(error, t) : (t('_admin_error') + 'Oprávnění zamítnuto'))
     } else {
-      showMsg(t('_admin_msg_deleted'))
+      supabase.functions.invoke('send-listing-email', {
+        method: 'POST',
+        body: { listingId: id, eventType: 'published' },
+      }).catch((e: unknown) => {
+        if (import.meta.env.DEV) console.error('[email notify]', e)
+      })
+      showMsg(t('_admin_msg_republished'))
+      setSelected(null)
+      await fetchListings()
+    }
+    setActing(false)
+  }
+
+  const unpublishL = async (id: string) => {
+    // "Stáhnout z nabídky" — soft unpublish, no reason required, notify owner
+    if (!confirm('Stáhnout inzerát z nabídky? Majitel dostane email.')) return
+    setActing(true)
+    const { data, error } = await (supabase.from('listings') as any)
+      .update({ status: 'rejected', rejection_reason: null })
+      .eq('id', id)
+      .select()
+    if (error || !data || data.length === 0) {
+      if (import.meta.env.DEV) console.error('Unpublish error:', error, data)
+      showMsg(error ? mapError(error, t) : (t('_admin_error') + 'Oprávnění zamítnuto'))
+    } else {
+      // Fire-and-forget: notify owner
+      supabase.functions.invoke('send-listing-email', {
+        method: 'POST',
+        body: { listingId: id, eventType: 'deleted' },
+      }).catch((e: unknown) => {
+        if (import.meta.env.DEV) console.error('[email notify]', e)
+      })
+      showMsg(t('_admin_msg_rejected'))
       setSelected(null)
       await fetchListings()
     }
@@ -310,13 +390,23 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
               {/* Actions */}
               <div style={{ borderTop: '1px solid var(--c-border)', paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
 
-                {(selected.status === 'pending_review' || selected.status === 'rejected') && (
+                {(selected.status === 'pending_review') && (
                   <button
                     onClick={() => approve(selected.id)}
                     disabled={acting}
                     style={{ padding: '11px 0', background: acting ? 'color-mix(in srgb, var(--c-green) 60%, transparent)' : 'var(--c-green)', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: acting ? 'not-allowed' : 'pointer' }}
                   >
                     {acting ? t('_admin_approve_acting') : t('_admin_approve')}
+                  </button>
+                )}
+
+                {(selected.status === 'rejected' || selected.status === 'deleted') && (
+                  <button
+                    onClick={() => republishL(selected.id)}
+                    disabled={acting}
+                    style={{ padding: '11px 0', background: acting ? 'color-mix(in srgb, var(--c-green) 60%, transparent)' : 'var(--c-green)', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: acting ? 'not-allowed' : 'pointer' }}
+                  >
+                    {acting ? t('_admin_republish_acting') : t('_admin_republish')}
                   </button>
                 )}
 
@@ -340,21 +430,23 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
 
                 {selected.status === 'published' && (
                   <button
-                    onClick={() => reject(selected.id)}
+                    onClick={() => unpublishL(selected.id)}
                     disabled={acting}
-                    style={{ padding: '9px 0', background: 'var(--c-yellow)', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
+                    style={{ padding: '11px 0', background: 'var(--c-yellow)', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
                   >
-                    {t('_admin_unpublish')}
+                    {t('_admin_unpublish')} · notifikace majiteli
                   </button>
                 )}
 
-                <button
-                  onClick={() => deleteL(selected.id)}
-                  disabled={acting}
-                  style={{ padding: '9px 0', background: 'transparent', color: 'var(--c-red)', border: '1px solid color-mix(in srgb, var(--c-red) 40%, transparent)', borderRadius: 8, fontSize: 13, cursor: 'pointer' }}
-                >
-                  {t('_admin_delete')}
-                </button>
+                <div style={{ borderTop: '1px dashed var(--c-border)', paddingTop: 10 }}>
+                  <button
+                    onClick={() => deleteL(selected.id)}
+                    disabled={acting}
+                    style={{ padding: '9px 0', width: '100%', background: 'transparent', color: 'var(--c-red)', border: '1px solid color-mix(in srgb, var(--c-red) 40%, transparent)', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: acting ? 0.5 : 1 }}
+                  >
+                    🗑 {t('_admin_delete')} — bez notifikace, nevratné
+                  </button>
+                </div>
               </div>
             </div>
           ) : (

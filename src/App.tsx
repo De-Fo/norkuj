@@ -213,7 +213,7 @@ export default function App() {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           {user && (
-            <button onClick={() => setRoute('favorites')} title={t('favorites_title')}
+            <button onClick={() => setRoute('favorites')} title={t('favorites_title')} aria-label={t('favorites_title')}
               style={{
                 minWidth: 32, height: 32, padding: '0 6px', background: 'transparent',
                 border: '1px solid var(--c-border)', borderRadius: 7, cursor: 'pointer',
@@ -227,7 +227,7 @@ export default function App() {
           )}
 
           <button onClick={toggleTheme}
-            title={t('theme_dark')}
+            title={t('theme_dark')} aria-label={t('theme_dark')}
             style={{
               minWidth: 32, height: 32, padding: 0, background: 'transparent',
               border: '1px solid var(--c-border)', borderRadius: 7, cursor: 'pointer',
@@ -295,7 +295,7 @@ export default function App() {
 
           {/* Help / How it works */}
           <button onClick={() => setTourOpen(true)}
-            title={t('_tour_title')}
+            title={t('_tour_title')} aria-label={t('_tour_title')}
             style={{
               minWidth: 32, height: 32, padding: 0, background: 'transparent',
               border: '1px solid var(--c-border)', borderRadius: 7, cursor: 'pointer',
@@ -307,6 +307,7 @@ export default function App() {
 
           {/* Lang switcher — far right */}
           <select value={lang} onChange={e => setLang(e.target.value as 'cz' | 'en')}
+            aria-label={lang === 'cz' ? 'Přepnout jazyk' : 'Switch language'}
             style={{
               height: 32, padding: '0 6px', background: 'transparent',
               border: '1px solid var(--c-border)', borderRadius: 7,

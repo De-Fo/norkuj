@@ -58,12 +58,16 @@ export function AuthPage({ onBack }: Props) {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) setMsg({ ok: false, text: mapError(error, t) })
     } else if (mode === 'reset') {
+      const resetRedirect = window.location.origin + '/'
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin + window.location.pathname,
+        redirectTo: resetRedirect,
       })
-      setMsg(error
-        ? { ok: false, text: mapError(error, t) }
-        : { ok: true, text: t('_auth_reset_sent') })
+      if (error) {
+        console.error('[resetPasswordForEmail]', error)
+        setMsg({ ok: false, text: mapError(error, t) })
+      } else {
+        setMsg({ ok: true, text: t('_auth_reset_sent') })
+      }
     }
     setLoading(false)
   }
