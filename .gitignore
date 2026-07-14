@@ -37,3 +37,4 @@ bus_times.sql
 public
 src/lib/analytics.ts
 supabase
+seo.ts

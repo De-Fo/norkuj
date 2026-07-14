@@ -6,6 +6,7 @@ import { formatPrice, formatDate, getImageUrl } from '../lib/utils'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useLang } from '../lib/lang'
+import { setListingMeta, setListingStructuredData } from '../lib/seo'
 
 const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_KEY
 
@@ -105,6 +106,9 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
 
       setListing(data as FullListing)
       setLoading(false)
+      // SEO: update head tags and structured data for this listing page
+      setListingMeta(data as any)
+      setListingStructuredData(data as any)
     }
 
     doFetch()

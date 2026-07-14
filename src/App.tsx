@@ -15,6 +15,7 @@ import type { Listing } from './lib/types'
 import { useLang } from './lib/lang'
 import { CookieConsent } from './components/CookieConsent'
 import { FeatureTour, isFirstVisit, markTourSeen } from './components/FeatureTour'
+import { usePageMeta } from './lib/seo'
 import { getImageUrl } from './lib/utils'
 
 type Theme = 'light' | 'dark'
@@ -171,6 +172,9 @@ export default function App() {
       setFavoritesIds(prev => { const n = new Set(prev); n.add(listingId); return n })
     }
   }
+
+  // ═══ SEO: update document head per route ═══
+  usePageMeta(route, selectedListingId)
 
   // ── Loading spinner ──
   if (authLoading) return (
