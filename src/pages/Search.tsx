@@ -349,13 +349,13 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
 
         {/* ── Toolbar: isochrone + sort + toggle map ── */}
         <div style={{
-          padding: '8px 12px', borderBottom: '1px solid var(--c-border)',
+          padding: isMobile ? '6px 8px' : '8px 12px', borderBottom: '1px solid var(--c-border)',
           background: 'var(--c-surface)', flexShrink: 0,
-          display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+          display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
         }}>
           {isoCenter ? (
             <>
-              <span style={{ fontSize: 11, color: 'var(--c-muted)', whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: isMobile ? 11 : 11, color: 'var(--c-muted)', whiteSpace: 'nowrap' }}>
                 📍 {isoCenter.lat.toFixed(4)}, {isoCenter.lng.toFixed(4)}
               </span>
               <span style={{ fontSize: 11, color: 'var(--c-faint)' }}>⏱</span>
@@ -368,16 +368,17 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
                   }
                 }}
                 style={{
-                  width: 48, padding: '2px 6px', border: '1px solid var(--c-border)',
+                  width: 48, padding: isMobile ? '6px 6px' : '2px 6px', border: '1px solid var(--c-border)',
                   borderRadius: 4, fontSize: 12, color: 'var(--c-text)', background: 'var(--c-surface)',
-                  outline: 'none', textAlign: 'center',
+                  outline: 'none', textAlign: 'center', minHeight: isMobile ? 36 : undefined,
                 }} />
               <span style={{ fontSize: 11, color: 'var(--c-muted)' }}>{t('iso_minutes')}</span>
               {isoLoading && <span style={{ fontSize: 10, color: 'var(--c-faint)' }}>{t('iso_loading')}</span>}
               <button onClick={() => { setIsoCenter(null); setIsoPolygon(null) }}
                 style={{
-                  padding: '2px 7px', border: '1px solid var(--c-border)', borderRadius: 4,
+                  padding: isMobile ? '6px 10px' : '2px 7px', border: '1px solid var(--c-border)', borderRadius: 4,
                   background: 'transparent', fontSize: 10, color: 'var(--c-muted)', cursor: 'pointer',
+                  minHeight: isMobile ? 34 : undefined,
                 }}>
                 {t('iso_cancel')}
               </button>
@@ -386,12 +387,12 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <button onClick={() => setIsoModeActive(v => !v)}
                 style={{
-                  padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
+                  padding: isMobile ? '7px 12px' : '4px 10px', borderRadius: 6, cursor: 'pointer',
                   border: isoModeActive ? 'none' : '1px solid var(--c-border)',
                   background: isoModeActive ? '#2563eb' : 'transparent',
                   color: isoModeActive ? '#fff' : 'var(--c-muted)',
-                  fontSize: 11, fontWeight: isoModeActive ? 600 : 400,
-                  whiteSpace: 'nowrap',
+                  fontSize: isMobile ? 12 : 11, fontWeight: isoModeActive ? 600 : 400,
+                  whiteSpace: 'nowrap', minHeight: isMobile ? 36 : undefined,
                 }}>
                 {t('iso_label')}
               </button>
@@ -410,12 +411,13 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
           )}
 
           {/* Sort + map toggle — locked to right edge */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto', flexShrink: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 3 : 6, marginLeft: 'auto', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
               <select value={filters.sortBy} onChange={e => onChange({ ...filters, sortBy: e.target.value as any })}
                 style={{
-                  padding: '2px 6px', border: '1px solid var(--c-border)', borderRadius: 4,
-                  fontSize: 10, color: 'var(--c-muted)', background: 'var(--c-surface)', outline: 'none',
+                  padding: isMobile ? '6px 8px' : '2px 6px', border: '1px solid var(--c-border)', borderRadius: 4,
+                  fontSize: isMobile ? 11 : 10, color: 'var(--c-muted)', background: 'var(--c-surface)', outline: 'none',
+                  minHeight: isMobile ? 34 : undefined,
                 }}>
                 <option value="date">{t('sort_date')}</option>
                 <option value="price">{t('sort_price')}</option>
@@ -423,21 +425,21 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
               </select>
               <button onClick={() => onChange({ ...filters, sortDir: filters.sortDir === 'desc' ? 'asc' : 'desc' })}
                 style={{
-                  padding: '2px 6px', border: '1px solid var(--c-border)', borderRadius: 4,
-                  background: 'transparent', fontSize: 11, color: 'var(--c-muted)', cursor: 'pointer',
-                  lineHeight: 1.2,
+                  padding: isMobile ? '6px 8px' : '2px 6px', border: '1px solid var(--c-border)', borderRadius: 4,
+                  background: 'transparent', fontSize: isMobile ? 13 : 11, color: 'var(--c-muted)', cursor: 'pointer',
+                  lineHeight: 1.2, minHeight: isMobile ? 34 : undefined,
                 }}>
                 {filters.sortDir === 'desc' ? '↓' : '↑'}
               </button>
             </div>
 
             <button onClick={onToggleMap} style={{
-              padding: '4px 10px', border: '1px solid var(--c-border)', borderRadius: 6,
+              padding: isMobile ? '7px 12px' : '4px 10px', border: '1px solid var(--c-border)', borderRadius: 6,
               background: showMap ? 'var(--c-surface)' : 'var(--c-accent)',
               color: showMap ? 'var(--c-text)' : 'white',
-              fontSize: 11, cursor: 'pointer', fontWeight: 500,
+              fontSize: isMobile ? 12 : 11, cursor: 'pointer', fontWeight: 500,
               boxShadow: showMap ? 'none' : '0 0 0 2px color-mix(in srgb, var(--c-accent) 40%, transparent)',
-              flexShrink: 0,
+              flexShrink: 0, minHeight: isMobile ? 36 : undefined,
               animation: showMap ? 'none' : 'pulse-map 2s ease-in-out infinite',
             }}>
               {isMobile ? (showMap ? t('mobile_list_btn') : t('mobile_map_btn')) : (showMap ? t('map_toggle_hide') : t('map_toggle_show'))}
@@ -445,7 +447,7 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
           </div>
         </div>
 
-        <div ref={listRef} style={{ flex: 1, overflowY: 'auto', padding: 10 }}>
+        <div ref={listRef} style={{ flex: 1, overflowY: 'auto', padding: isMobile ? 8 : 10 }}>
           {loading && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {[1,2,3,4,5].map(i => (

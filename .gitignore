@@ -38,3 +38,6 @@ public
 src/lib/analytics.ts
 supabase
 seo.ts
+emailtemplates.xml
+CompareUlovdomov.tsx
+CompareBezrealitky.tsx

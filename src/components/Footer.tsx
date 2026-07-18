@@ -82,10 +82,12 @@ export function Footer() {
             zIndex: 80, padding: 16,
           }}>
           <div style={{
-            background: 'var(--c-surface)', borderRadius: 16,
+            background: 'var(--c-surface)', borderRadius: window.innerWidth < 768 ? 0 : 16,
             maxWidth: 440, width: '100%',
-            maxHeight: '90vh', overflow: 'hidden',
-            boxShadow: '0 24px 64px rgba(0,0,0,0.35)',
+            maxHeight: window.innerWidth < 768 ? '100dvh' : '90vh',
+            height: window.innerWidth < 768 ? '100dvh' : undefined,
+            overflow: 'hidden',
+            boxShadow: window.innerWidth < 768 ? 'none' : '0 24px 64px rgba(0,0,0,0.35)',
             position: 'relative',
           }}>
             {/* Header */}

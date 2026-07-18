@@ -306,17 +306,22 @@ export function CreateListingPage({ onDone, editListing }: Props) {
   }
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      zIndex: 50, padding: 20,
-    }} onClick={(e) => { if (e.target === e.currentTarget) requestClose() }}>
+    <div onClick={(e) => { if (e.target === e.currentTarget) requestClose() }}
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex: 50, padding: window.innerWidth < 768 ? 0 : 20,
+      }}>
 
       <div style={{
-        width: '80%', height: '80%', maxWidth: 900,
-        background: 'var(--c-surface)', borderRadius: 16,
+        width: window.innerWidth < 768 ? '100%' : '80%',
+        height: window.innerWidth < 768 ? '100%' : '80%',
+        maxWidth: window.innerWidth < 768 ? undefined : 900,
+        background: 'var(--c-surface)',
+        borderRadius: window.innerWidth < 768 ? 0 : 16,
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.3)', position: 'relative',
+        boxShadow: window.innerWidth < 768 ? 'none' : '0 20px 60px rgba(0,0,0,0.3)',
+        position: 'relative',
       }}>
 
         <button onClick={requestClose} aria-label={t('_create_nav_cancel')} style={{

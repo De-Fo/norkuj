@@ -6,6 +6,8 @@ import { AuthPage } from './pages/Auth'
 import { CreateListingPage } from './pages/CreateListing'
 import { ListingDetail } from './pages/ListingDetail'
 import { AdminPanel } from './pages/AdminPanel'
+import { CompareBezrealitkyPage } from './pages/CompareBezrealitky'
+import { CompareUlovdomovPage } from './pages/CompareUlovdomov'
 import { Wordmark } from './components/Wordmark'
 import { ProfilePage } from './pages/Profile'
 import type { SearchFilters } from './lib/types'
@@ -19,7 +21,7 @@ import { usePageMeta } from './lib/seo'
 import { getImageUrl } from './lib/utils'
 
 type Theme = 'light' | 'dark'
-type Route = 'search' | 'auth' | 'profile' | 'my-listings' | 'favorites'
+type Route = 'search' | 'auth' | 'profile' | 'my-listings' | 'favorites' | 'compare-bezrealitky' | 'compare-ulovdomov'
 
 function getInitialTheme(): Theme {
   const stored = localStorage.getItem('norkuj-theme')
@@ -38,8 +40,15 @@ export default function App() {
     return m && UUID_RE.test(m[1]) ? m[1] : null
   }
 
+  const parseComparePath = (): Route | null => {
+    const path = window.location.pathname
+    if (path === '/compare/bezrealitky-alternativa') return 'compare-bezrealitky'
+    if (path === '/compare/ulovdomov-alternativa') return 'compare-ulovdomov'
+    return null
+  }
+
   const [user, setUser] = useState<User | null>(null)
-  const [route, setRoute] = useState<Route>('search')
+  const [route, setRoute] = useState<Route>(() => parseComparePath() ?? 'search')
   const [authLoading, setAuthLoading] = useState(true)
   const [filters, setFilters] = useState<SearchFilters>(DEFAULT_FILTERS)
   const [showMap, setShowMap] = useState(true)
@@ -75,7 +84,7 @@ export default function App() {
       // history.back() triggers popstate which clears selectedListingId
       window.history.back()
     } else {
-      // Direct load or refresh at /listing/{id} — replace URL silently
+      // Direct load or refresh at /listing/{id} - replace URL silently
       if (parseListingIdFromPath()) {
         window.history.replaceState(null, '', '/')
       }
@@ -83,7 +92,7 @@ export default function App() {
     }
   }, [])
 
-  // Popstate: user pressed back/forward — sync listing modal with URL
+  // Popstate: user pressed back/forward - sync listing modal with URL
   useEffect(() => {
     const onPop = () => {
       const id = parseListingIdFromPath()
@@ -200,6 +209,14 @@ export default function App() {
 
   if (route === 'auth') return <AuthPage onBack={() => setRoute('search')} />
   if (route === 'profile') return <ProfilePage user={user} onBack={() => setRoute('search')} />
+  if (route === 'compare-bezrealitky') return <CompareBezrealitkyPage onGoHome={() => {
+    setRoute('search')
+    window.history.replaceState(null, '', '/')
+  }} />
+  if (route === 'compare-ulovdomov') return <CompareUlovdomovPage onGoHome={() => {
+    setRoute('search')
+    window.history.replaceState(null, '', '/')
+  }} />
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden' }}>
@@ -207,119 +224,177 @@ export default function App() {
       <header style={{
         height: 48, flexShrink: 0, background: 'var(--c-surface)',
         borderBottom: '1px solid var(--c-border)',
-        display: 'flex', alignItems: 'center', padding: '0 16px', justifyContent: 'space-between',
+        display: 'flex', alignItems: 'center', padding: `0 ${isMobile ? 8 : 16}px`, justifyContent: 'space-between',
         transition: 'background 0.2s',
+        gap: isMobile ? 4 : 0,
       }}>
         <button onClick={() => { setRoute('search'); setShowMap(true); setShowCreate(false); setSelectedListingId(null); setShowAdmin(false) }}
           style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
           <Wordmark size="md" />
         </button>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 3 : 5 }}>
           {user && (
             <button onClick={() => setRoute('favorites')} title={t('favorites_title')} aria-label={t('favorites_title')}
               style={{
-                minWidth: 32, height: 32, padding: '0 6px', background: 'transparent',
+                width: 32, height: 32, padding: 0, background: 'transparent',
                 border: '1px solid var(--c-border)', borderRadius: 7, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
                 color: favoritesIds.size > 0 ? '#eab308' : 'var(--c-muted)',
-                fontSize: 12, fontWeight: 500,
+                fontSize: 14, flexShrink: 0,
               }}>
-              <span style={{ fontSize: 14, lineHeight: 1 }}>{favoritesIds.size > 0 ? '⭐️' : '⭐️'}</span>
-              {favoritesIds.size > 0 && <span style={{ fontSize: 11 }}>{favoritesIds.size}</span>}
+              {favoritesIds.size > 0 ? '⭐️' : '☆'}
             </button>
           )}
 
-          <button onClick={toggleTheme}
-            title={t('theme_dark')} aria-label={t('theme_dark')}
-            style={{
-              minWidth: 32, height: 32, padding: 0, background: 'transparent',
-              border: '1px solid var(--c-border)', borderRadius: 7, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 14, lineHeight: 1,
-            }}>
-            {theme === 'light' ? '🌙' : '☀️'}
-          </button>
-
-          {isAdmin && (
-            <button onClick={() => setShowAdmin(true)} style={{
-              height: 32, padding: '0 10px', background: '#7c3aed', color: 'white',
-              border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 500, cursor: 'pointer',
-            }}>
-              🛠 Admin
-            </button>
-          )}
-
-          {user ? (
+          {/* On desktop: full action row. On mobile: overflow menu. */}
+          {isMobile ? (
             <>
-              <button onClick={() => setShowCreate(true)} style={{
-                height: 32, padding: '0 12px', background: 'green', color: 'white',
-                border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 500, cursor: 'pointer',
-                display: 'flex', alignItems: 'center',
-              }}>
-                {t('add_listing')}
-              </button>
-              {!isMobile && (
-                <button onClick={() => setRoute('my-listings')} style={{
-                  height: 32, padding: '0 10px', background: 'transparent', color: 'var(--c-muted)',
-                  border: '1px solid var(--c-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer',
-                }}>
-                  {t('my_listings')}
+              {/* Visible mobile actions */}
+              {user && (
+                <button onClick={() => setShowCreate(true)} title={t('add_listing')} aria-label={t('add_listing')}
+                  style={{
+                    width: 32, height: 32, padding: 0, border: 'none', borderRadius: 7,
+                    background: 'green', color: 'white', fontSize: 16, cursor: 'pointer', flexShrink: 0,
+                  }}>
+                  ＋
                 </button>
               )}
-              <button onClick={() => setRoute('profile')} style={{
-                height: 32, padding: '0 10px', background: 'transparent', color: 'var(--c-muted)',
-                border: '1px solid var(--c-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer',
-              }}>
-                {isMobile ? '👤' : t('profile')}
+              {!user && (
+                <button onClick={() => setRoute('auth')} style={{
+                  height: 32, padding: '0 10px', border: 'none', borderRadius: 7,
+                  background: 'darkblue', color: 'white', fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                }}>
+                  {t('register')}
+                </button>
+              )}
+
+              {/* Lang compact */}
+              <button onClick={() => setLang(lang === 'cz' ? 'en' : 'cz')}
+                aria-label={lang === 'cz' ? 'Přepnout jazyk' : 'Switch language'}
+                style={{
+                  width: 32, height: 32, padding: 0, background: 'transparent',
+                  border: '1px solid var(--c-border)', borderRadius: 7, cursor: 'pointer', flexShrink: 0,
+                  fontSize: 14, lineHeight: 1,
+                }}>
+                {lang === 'cz' ? '🇨🇿' : '🇬🇧'}
               </button>
-              <button onClick={() => supabase.auth.signOut()} style={{
-                height: 32, padding: '0 10px', background: 'transparent', color: 'var(--c-muted)',
-                border: '1px solid var(--c-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer',
-              }}>
-                {isMobile ? '🚪' : t('logout')}
-              </button>
+
+              {/* ⋯ Overflow menu */}
+              <MoreMenu>
+                {isAdmin && (
+                  <MoreItem onClick={() => setShowAdmin(true)}>🛠 {t('_admin_panel').replace('🛠 ','')}</MoreItem>
+                )}
+                {user && (
+                  <MoreItem onClick={() => setRoute('my-listings')}>{t('my_listings')}</MoreItem>
+                )}
+                <MoreItem onClick={toggleTheme}>
+                  {theme === 'light' ? '🌙' : '☀️'} {theme === 'light' ? t('theme_dark') : t('theme_light')}
+                </MoreItem>
+                <MoreItem onClick={() => setTourOpen(true)}>❓ {t('_tour_title')}</MoreItem>
+                {user ? (
+                  <>
+                    <MoreItem onClick={() => setRoute('profile')}>👤 {t('profile')}</MoreItem>
+                    <MoreItem onClick={() => supabase.auth.signOut()}>🚪 {t('logout')}</MoreItem>
+                  </>
+                ) : (
+                  <MoreItem onClick={() => setRoute('auth')}>👤 {t('login')}</MoreItem>
+                )}
+              </MoreMenu>
             </>
           ) : (
+            /* ── Desktop actions ── */
             <>
-              <button onClick={() => setRoute('auth')} style={{
-                height: 32, padding: '0 10px', background: 'transparent', color: 'var(--c-muted)',
-                border: '1px solid var(--c-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer',
-              }}>
-                {isMobile ? '👤' : t('login')}
+              <button onClick={toggleTheme}
+                title={t('theme_dark')} aria-label={t('theme_dark')}
+                style={{
+                  minWidth: 32, height: 32, padding: 0, background: 'transparent',
+                  border: '1px solid var(--c-border)', borderRadius: 7, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 14, lineHeight: 1,
+                }}>
+                {theme === 'light' ? '🌙' : '☀️'}
               </button>
-              <button onClick={() => setRoute('auth')} style={{
-                height: 32, padding: '0 12px', background: 'darkblue', color: 'white',
-                border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 500, cursor: 'pointer',
-              }}>
-                {isMobile ? '➕' : t('register')}
+
+              {isAdmin && (
+                <button onClick={() => setShowAdmin(true)} style={{
+                  height: 32, padding: '0 10px', background: '#7c3aed', color: 'white',
+                  border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                }}>
+                  🛠 Admin
+                </button>
+              )}
+
+              {user ? (
+                <>
+                  <button onClick={() => setShowCreate(true)} style={{
+                    height: 32, padding: '0 12px', background: 'green', color: 'white',
+                    border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center',
+                  }}>
+                    {t('add_listing')}
+                  </button>
+                  <button onClick={() => setRoute('my-listings')} style={{
+                    height: 32, padding: '0 10px', background: 'transparent', color: 'var(--c-muted)',
+                    border: '1px solid var(--c-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer',
+                  }}>
+                    {t('my_listings')}
+                  </button>
+                  <button onClick={() => setRoute('profile')} style={{
+                    height: 32, padding: '0 10px', background: 'transparent', color: 'var(--c-muted)',
+                    border: '1px solid var(--c-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer',
+                  }}>
+                    {t('profile')}
+                  </button>
+                  <button onClick={() => supabase.auth.signOut()} style={{
+                    height: 32, padding: '0 10px', background: 'transparent', color: 'var(--c-muted)',
+                    border: '1px solid var(--c-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer',
+                  }}>
+                    {t('logout')}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button onClick={() => setRoute('auth')} style={{
+                    height: 32, padding: '0 10px', background: 'transparent', color: 'var(--c-muted)',
+                    border: '1px solid var(--c-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer',
+                  }}>
+                    {t('login')}
+                  </button>
+                  <button onClick={() => setRoute('auth')} style={{
+                    height: 32, padding: '0 12px', background: 'darkblue', color: 'white',
+                    border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                  }}>
+                    {t('register')}
+                  </button>
+                </>
+              )}
+
+              {/* Help / How it works */}
+              <button onClick={() => setTourOpen(true)}
+                title={t('_tour_title')} aria-label={t('_tour_title')}
+                style={{
+                  minWidth: 32, height: 32, padding: 0, background: 'transparent',
+                  border: '1px solid var(--c-border)', borderRadius: 7, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 14, lineHeight: 1, color: 'var(--c-muted)',
+                }}>
+                ❓
               </button>
+
+              {/* Lang switcher */}
+              <select value={lang} onChange={e => setLang(e.target.value as 'cz' | 'en')}
+                aria-label={lang === 'cz' ? 'Přepnout jazyk' : 'Switch language'}
+                style={{
+                  height: 32, padding: '0 6px', background: 'transparent',
+                  border: '1px solid var(--c-border)', borderRadius: 7,
+                  fontSize: 11, color: 'var(--c-muted)', cursor: 'pointer', outline: 'none',
+                }}>
+                <option value="cz">🇨🇿 CZ</option>
+                <option value="en">🇬🇧 EN</option>
+              </select>
             </>
           )}
-
-          {/* Help / How it works */}
-          <button onClick={() => setTourOpen(true)}
-            title={t('_tour_title')} aria-label={t('_tour_title')}
-            style={{
-              minWidth: 32, height: 32, padding: 0, background: 'transparent',
-              border: '1px solid var(--c-border)', borderRadius: 7, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 14, lineHeight: 1, color: 'var(--c-muted)',
-            }}>
-            ❓
-          </button>
-
-          {/* Lang switcher — far right */}
-          <select value={lang} onChange={e => setLang(e.target.value as 'cz' | 'en')}
-            aria-label={lang === 'cz' ? 'Přepnout jazyk' : 'Switch language'}
-            style={{
-              height: 32, padding: '0 6px', background: 'transparent',
-              border: '1px solid var(--c-border)', borderRadius: 7,
-              fontSize: 11, color: 'var(--c-muted)', cursor: 'pointer', outline: 'none',
-            }}>
-            <option value="cz">🇨🇿 CZ</option>
-            <option value="en">🇬🇧 EN</option>
-          </select>
         </div>
       </header>
 
@@ -373,84 +448,73 @@ export default function App() {
       {/* ═══ Feature tour ═══ */}
       <FeatureTour open={tourOpen} onClose={() => setTourOpen(false)} />
 
-      {/* ═══ GLOBAL STYLES ═══ */}
+      {/* ═══ GLOBAL STYLES - scoped micro-interactions only ═══ */}
       <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes slideDown { from { opacity: 0; max-height: 0 } to { opacity: 1; max-height: 60vh } }
-        @keyframes slideUp { from { opacity: 1; max-height: 60vh } to { opacity: 0; max-height: 0 } }
-        @keyframes pulse-iso { 0%, 100% { opacity: 0.35; transform: scale(1); } 50% { opacity: 1; transform: scale(1.4); } }
-        @keyframes pulse-map { 0%, 100% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--c-accent) 30%, transparent); } 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--c-accent) 50%, transparent); } }
-
-        :root,
-        [data-theme="light"] {
-          --c-bg: #f4f6f8;
-          --c-surface: #ffffff;
-          --c-surface-raised: #fafbfc;
-          --c-border: #e2e8f0;
-          --c-border-md: #cbd5e1;
-          --c-text: #0f172a;
-          --c-text-secondary: #334155;
-          --c-muted: #64748b;
-          --c-faint: #94a3b8;
-          --c-accent: #2563eb;
-          --c-accent-hover: #1d4ed8;
-          --c-green: #16a34a;
-          --c-yellow: #ca8a04;
-          --c-red: #dc2626;
-          --c-rk: #e2001a;
-          color-scheme: light;
-        }
-
-        [data-theme="dark"] {
-          --c-bg: #0f1117;
-          --c-surface: #1a1d27;
-          --c-surface-raised: #22252f;
-          --c-border: #2a2d3a;
-          --c-border-md: #3a3d4a;
-          --c-text: #e8eaf0;
-          --c-text-secondary: #c8cad0;
-          --c-muted: #9497a5;
-          --c-faint: #6a6d7a;
-          --c-accent: #3b82f6;
-          --c-accent-hover: #60a5fa;
-          --c-green: #22c55e;
-          --c-yellow: #eab308;
-          --c-red: #ef4444;
-          --c-rk: #ff4455;
-          color-scheme: dark;
-        }
-
-        body {
-          background: var(--c-bg);
-          color: var(--c-text);
-          transition: background 0.2s, color 0.2s;
-        }
-
-        *, *::before, *::after {
-          transition: background-color 0.15s, border-color 0.15s, color 0.15s;
-        }
-
-        ::selection {
-          background: var(--c-accent);
-          color: white;
-        }
-
-        @media (max-width: 767px) {
-          .desktop-only { display: none !important; }
-        }
-        @media (min-width: 768px) {
-          .mobile-only { display: none !important; }
-        }
-
-        input, select, button, textarea {
-          transition: all 0.12s;
-        }
-
-        button:active {
-          transform: scale(0.96);
-        }
+        input, select, button, textarea { transition: all 0.12s; }
+        button:active { transform: scale(0.96); }
+        *, *::before, *::after { transition: background-color 0.15s, border-color 0.15s, color 0.15s; }
       `}</style>
     </div>
+  )
+}
+
+// ── Mobile overflow menu ──────────────────────────────────────
+function MoreMenu({ children }: { children: React.ReactNode }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    const keyHandler = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    // Delay listener so the toggle click doesn't immediately close
+    requestAnimationFrame(() => document.addEventListener('click', handler))
+    document.addEventListener('keydown', keyHandler)
+    return () => {
+      document.removeEventListener('click', handler)
+      document.removeEventListener('keydown', keyHandler)
+    }
+  }, [open])
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button onClick={() => setOpen(v => !v)}
+        aria-label="More"
+        style={{
+          width: 32, height: 32, padding: 0, background: 'transparent',
+          border: '1px solid var(--c-border)', borderRadius: 7, cursor: 'pointer', flexShrink: 0,
+          fontSize: 16, lineHeight: 1, color: 'var(--c-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+        ⋯
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', top: '100%', right: 0, marginTop: 4, zIndex: 100,
+          background: 'var(--c-surface)', border: '1px solid var(--c-border)',
+          borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+          minWidth: 180, overflow: 'hidden', padding: 4,
+        }}>
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function MoreItem({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button onClick={onClick} style={{
+      display: 'block', width: '100%', textAlign: 'left', padding: '10px 12px',
+      border: 'none', borderRadius: 6, background: 'transparent', cursor: 'pointer',
+      fontSize: 13, color: 'var(--c-text)', whiteSpace: 'nowrap',
+    }}
+      onMouseEnter={e => (e.currentTarget.style.background = 'var(--c-bg)')}
+      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+    >
+      {children}
+    </button>
   )
 }
 

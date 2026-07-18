@@ -7,26 +7,43 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <!-- Primary meta -->
-    <title>norkuj — najdi své bydlení v Praze</title>
-    <meta name="description" content="Pronájem bytů, pokojů a sdíleného bydlení v Praze. Filtruj podle MHD, ceny a lokality. Zdarma, bez realitky." />
-    <meta name="description" lang="en" content="Find your home in Prague. Apartments, rooms and shared living for rent. Filter by transit, price and location. Free, no agency." />
+    <title>norkuj - najdi bydlení v Praze bez realitky</title>
+    <meta name="description" content="Pronájem bytů, pokojů a sdíleného bydlení v Praze. Bez realitky, bez provize, napřímo. Filtruj podle MHD, ceny a lokality." />
+    <meta name="description" lang="en" content="Find your home in Prague. Apartments, rooms and shared living for rent. No agency, no commission, direct from landlord. Filter by transit, price and location." />
 
     <!-- Open Graph -->
-    <meta property="og:title" content="norkuj — najdi své bydlení v Praze" />
-    <meta property="og:description" content="Pronájem bytů, pokojů a sdíleného bydlení v Praze. Filtruj podle MHD, ceny a lokality." />
+    <meta property="og:title" content="norkuj - najdi bydlení v Praze bez realitky" />
+    <meta property="og:description" content="Pronájem bytů, pokojů a sdíleného bydlení v Praze bez realitky, bez provize a s filtrováním podle MHD." />
     <meta property="og:url" content="https://norkuj.cz/" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="norkuj" />
     <meta property="og:locale" content="cs_CZ" />
+    <meta property="og:image" content="https://norkuj.cz/og-image.png" />
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="norkuj — najdi své bydlení v Praze" />
-    <meta name="twitter:description" content="Pronájem bytů, pokojů a sdíleného bydlení v Praze. Filtruj podle MHD, ceny a lokality." />
+    <meta name="twitter:title" content="norkuj - najdi bydlení v Praze bez realitky" />
+    <meta name="twitter:description" content="Pronájem bytů, pokojů a sdíleného bydlení v Praze bez realitky, bez provize a s filtrováním podle MHD." />
+    <meta name="twitter:image" content="https://norkuj.cz/og-image.png" />
 
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Pre-rendered summary for search crawlers before JavaScript hydration.
+           Kept in DOM for SEO (hidden visually). React replaces this on load. -->
+      <div style="display:none">
+        <h1>norkuj - najdi bydlení v Praze bez realitky</h1>
+        <p>Peer-to-peer platforma pro pronájem bytů, pokojů a sdíleného bydlení v Praze.
+        Žádná realitka, žádná provize - napřímo mezi nájemníkem a majitelem.</p>
+        <ul>
+          <li>Prohlížej nabídky bytů a spolubydlení v Praze</li>
+          <li>Filtruj podle lokality, ceny a vybavení</li>
+          <li>Vyhledávej podle metra (A, B, C) a tramvají</li>
+          <li>Kontaktuj majitele napřímo - bez provize</li>
+          <li>Přidej vlastní inzerát zdarma</li>
+        </ul>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

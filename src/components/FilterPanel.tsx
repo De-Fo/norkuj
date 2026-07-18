@@ -21,13 +21,14 @@ function toggle<T>(arr: T[], val: T): T[] {
   return arr.includes(val) ? arr.filter(v => v !== val) : [...arr, val]
 }
 
-function Chip({ active, onClick, children, color }: {
-  active?: boolean; onClick: () => void; children: React.ReactNode; color?: string
+function Chip({ active, onClick, children, color, isMobile }: {
+  active?: boolean; onClick: () => void; children: React.ReactNode; color?: string; isMobile?: boolean
 }) {
+  const tPad = isMobile ? 6 : 4
   return (
     <button onClick={onClick} style={{
       display: 'flex', alignItems: 'center', gap: 4,
-      padding: '4px 10px', borderRadius: 20, cursor: 'pointer',
+      padding: `${tPad}px ${isMobile ? 14 : 10}px`, borderRadius: 20, cursor: 'pointer',
       border: active ? 'none' : '1px solid var(--c-border)',
       background: active ? (color ?? 'var(--c-accent)') : 'var(--c-surface)',
       color: active ? '#fff' : 'var(--c-muted)',
@@ -102,7 +103,7 @@ export function FilterPanel({ filters, onChange, resultCount, loading, isMobile 
           overflow: 'hidden',
           minHeight: 0,
         }}>
-          <div style={{ padding: expanded ? '0 12px 14px' : '0 12px', display: 'flex', flexDirection: 'column', gap: 14, maxHeight: isMobile ? '30vh' : '35vh', overflowY: 'auto' }}>
+          <div style={{ padding: expanded ? '0 12px 14px' : '0 12px', display: 'flex', flexDirection: 'column', gap: 14, maxHeight: isMobile ? '50vh' : '35vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
 
           {/* Toggle switch for map-area filtering — always visible at top */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0' }}>
@@ -126,7 +127,7 @@ export function FilterPanel({ filters, onChange, resultCount, loading, isMobile 
 
           <Section label={t('metro_label')} hint={t('multi_hint')}>
             {METRO_LINES.map(line => (
-              <Chip key={line} active={filters.transitLines.includes(line)} color={lineColor(line)}
+              <Chip key={line} active={filters.transitLines.includes(line)} color={lineColor(line)} isMobile={isMobile}
                 onClick={() => set({ transitLines: toggle(filters.transitLines, line) })}>
                 <span style={{ width: 7, height: 7, borderRadius: '50%', background: filters.transitLines.includes(line) ? 'rgba(255,255,255,0.7)' : lineColor(line) }} />
                 Metro {line}
@@ -137,7 +138,7 @@ export function FilterPanel({ filters, onChange, resultCount, loading, isMobile 
           <Section label={t('tram_label')} hint={t('multi_hint')}>
             {TRAM_LINES.map(t => (
               <Chip key={t} active={filters.transitLines.includes(t)}
-                onClick={() => set({ transitLines: toggle(filters.transitLines, t) })}>
+                onClick={() => set({ transitLines: toggle(filters.transitLines, t) })} isMobile={isMobile}>
                 {t}
               </Chip>
             ))}
@@ -146,7 +147,7 @@ export function FilterPanel({ filters, onChange, resultCount, loading, isMobile 
           <Section label={t('district_label')} hint={t('multi_hint')}>
             {PRAGUE_DISTRICTS.map(d => (
               <Chip key={d} active={filters.districts.includes(d)}
-                onClick={() => set({ districts: toggle(filters.districts, d) })}>
+                onClick={() => set({ districts: toggle(filters.districts, d) })} isMobile={isMobile}>
                 {d}
               </Chip>
             ))}
@@ -155,7 +156,7 @@ export function FilterPanel({ filters, onChange, resultCount, loading, isMobile 
           <Section label={t('_floorplan')} hint={t('multi_hint')}>
             {TYPE_ORDER.map(t => (
               <Chip key={t} active={filters.propertyTypes.includes(t)}
-                onClick={() => set({ propertyTypes: toggle(filters.propertyTypes, t) })}>
+                onClick={() => set({ propertyTypes: toggle(filters.propertyTypes, t) })} isMobile={isMobile}>
                 {PROPERTY_TYPE_LABELS[t]}
               </Chip>
             ))}
@@ -175,17 +176,17 @@ export function FilterPanel({ filters, onChange, resultCount, loading, isMobile 
 
           <Section label={t('min_area_label')} hint="m²">
             {AREA_OPTS.map(a => (
-              <Chip key={a} active={filters.minArea === a} onClick={() => set({ minArea: filters.minArea === a ? 0 : a })}>
+              <Chip key={a} active={filters.minArea === a} onClick={() => set({ minArea: filters.minArea === a ? 0 : a })} isMobile={isMobile}>
                 {a}+ m²
               </Chip>
             ))}
           </Section>
 
           <Section label={t('amenities_label')}>
-            <Chip active={filters.furnished} onClick={() => set({ furnished: !filters.furnished })}>{t('amenities_furnished')}</Chip>
-            <Chip active={filters.petsAllowed} onClick={() => set({ petsAllowed: !filters.petsAllowed })}>{t('amenities_pets')}</Chip>
-            <Chip active={filters.parking} onClick={() => set({ parking: !filters.parking })}>{t('amenities_parking')}</Chip>
-            <Chip active={filters.balcony} onClick={() => set({ balcony: !filters.balcony })}>{t('amenities_balcony')}</Chip>
+            <Chip active={filters.furnished} onClick={() => set({ furnished: !filters.furnished })} isMobile={isMobile}>{t('amenities_furnished')}</Chip>
+            <Chip active={filters.petsAllowed} onClick={() => set({ petsAllowed: !filters.petsAllowed })} isMobile={isMobile}>{t('amenities_pets')}</Chip>
+            <Chip active={filters.parking} onClick={() => set({ parking: !filters.parking })} isMobile={isMobile}>{t('amenities_parking')}</Chip>
+            <Chip active={filters.balcony} onClick={() => set({ balcony: !filters.balcony })} isMobile={isMobile}>{t('amenities_balcony')}</Chip>
           </Section>
 
           {activeCount > 0 && (

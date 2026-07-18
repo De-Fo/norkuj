@@ -79,8 +79,8 @@ export function MyListingsPage({ user, onBack, onEdit }: Props) {
   if (!user) return null
 
   return (
-    <div style={{ maxWidth: 720, margin: '32px auto', padding: 16 }}>
-      <button onClick={onBack} style={{ marginBottom: 16, padding: '8px 14px', border: '1px solid var(--c-border)', borderRadius: 8, background: 'var(--c-surface)', cursor: 'pointer', fontSize: 13 }}>
+    <div style={{ maxWidth: 720, margin: window.innerWidth < 768 ? '16px auto' : '32px auto', padding: 16 }}>
+      <button onClick={onBack} style={{ marginBottom: 16, padding: '10px 16px', border: '1px solid var(--c-border)', borderRadius: 8, background: 'var(--c-surface)', cursor: 'pointer', fontSize: 13, minHeight: 40 }}>
         {t('_mylistings_back')}
       </button>
 
@@ -122,16 +122,16 @@ export function MyListingsPage({ user, onBack, onEdit }: Props) {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
               {(l.status === 'draft' || l.status === 'published' || l.status === 'rejected') && (
-                <button onClick={() => onEdit(l)} style={{ padding: '6px 12px', fontSize: 12, border: '1px solid var(--c-border)', borderRadius: 7, background: 'var(--c-surface)', cursor: 'pointer' }}>
+                <button onClick={() => onEdit(l)} style={{ padding: '8px 14px', fontSize: 12, border: '1px solid var(--c-border)', borderRadius: 7, background: 'var(--c-surface)', cursor: 'pointer', minHeight: 34 }}>
                   {t('_mylistings_edit')}
                 </button>
               )}
               {l.status === 'published' && (
-                <button onClick={() => handleMarkRented(l.id)} disabled={busyId === l.id} style={{ padding: '6px 12px', fontSize: 12, border: 'none', borderRadius: 7, background: 'var(--c-accent)', color: 'white', cursor: 'pointer' }}>
+                <button onClick={() => handleMarkRented(l.id)} disabled={busyId === l.id} style={{ padding: '8px 14px', fontSize: 12, border: 'none', borderRadius: 7, background: 'var(--c-accent)', color: 'white', cursor: 'pointer', minHeight: 34 }}>
                   {t('_mylistings_mark_rented')}
                 </button>
               )}
-              <button onClick={() => handleDelete(l.id)} disabled={busyId === l.id} style={{ padding: '6px 12px', fontSize: 12, border: 'none', borderRadius: 7, background: 'color-mix(in srgb, var(--c-red) 15%, transparent)', color: 'var(--c-red)', cursor: 'pointer' }}>
+              <button onClick={() => handleDelete(l.id)} disabled={busyId === l.id} style={{ padding: '8px 14px', fontSize: 12, border: 'none', borderRadius: 7, background: 'color-mix(in srgb, var(--c-red) 15%, transparent)', color: 'var(--c-red)', cursor: 'pointer', minHeight: 34 }}>
                 {t('_mylistings_delete')}
               </button>
             </div>

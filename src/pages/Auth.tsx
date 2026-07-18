@@ -7,8 +7,8 @@ import { mapError } from '../lib/errors'
 type Mode = 'login' | 'register' | 'reset'
 
 const inp: React.CSSProperties = {
-  width: '100%', padding: '10px 12px', border: '1px solid var(--c-border)',
-  borderRadius: 8, fontSize: 13, color: 'var(--c-text)', background: 'var(--c-surface)', outline: 'none',
+  width: '100%', padding: '12px', border: '1px solid var(--c-border)',
+  borderRadius: 8, fontSize: 16, color: 'var(--c-text)', background: 'var(--c-surface)', outline: 'none',
 }
 
 interface Props {
@@ -104,7 +104,7 @@ export function AuthPage({ onBack }: Props) {
               onKeyDown={e => e.key === 'Enter' && handleUpdatePassword()} />
             {msg && <div style={{ fontSize: 12, color: msg.ok ? 'var(--c-green)' : 'var(--c-red)' }}>{msg.text}</div>}
             <button onClick={handleUpdatePassword} disabled={loading || newPassword.length < 6}
-              style={{ padding: '11px 0', background: 'var(--c-accent)', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+              style={{ padding: '13px 0', background: 'var(--c-accent)', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer', minHeight: 44, fontFamily: 'inherit' }}>
               {loading ? '...' : t('_auth_submit_newpassword')}
             </button>
           </div>
@@ -177,7 +177,7 @@ export function AuthPage({ onBack }: Props) {
             <div style={{ fontSize: 12, color: msg.ok ? 'var(--c-green)' : 'var(--c-red)' }}>{msg.text}</div>
           )}
 
-          <button onClick={handleSubmit} disabled={loading} style={{ padding: '11px 0', background: 'var(--c-accent)', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+          <button onClick={handleSubmit} disabled={loading} style={{ padding: '13px 0', background: 'var(--c-accent)', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer', minHeight: 44 }}>
             {loading ? '...' : mode === 'login' ? t('_auth_submit_login') : mode === 'register' ? t('_auth_submit_register') : t('_auth_submit_reset')}
           </button>
 
@@ -191,7 +191,7 @@ export function AuthPage({ onBack }: Props) {
           {mode !== 'reset' && (
             <>
               <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--c-muted)' }}>{t('_auth_or')}</div>
-              <button onClick={handleGoogle} style={{ padding: '11px 0', background: 'var(--c-bg)', border: '1px solid var(--c-border)', borderRadius: 8, fontSize: 13, cursor: 'pointer' }}>
+              <button onClick={handleGoogle} style={{ padding: '13px 0', background: 'var(--c-bg)', border: '1px solid var(--c-border)', borderRadius: 8, fontSize: 14, cursor: 'pointer', minHeight: 44 }}>
                 {t('_auth_google')}
               </button>
             </>

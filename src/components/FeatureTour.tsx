@@ -12,39 +12,27 @@ interface FeatureSlide {
 
 const FEATURE_SLIDES: FeatureSlide[] = [
   {
-    title: '_tour_slide1_title',
-    description: '_tour_slide1_desc',
-    mediaUrl: '',
-    mediaType: 'video',
-  },
-  {
     title: '_tour_slide2_title',
     description: '_tour_slide2_desc',
-    mediaUrl: '',
+    mediaUrl: 'https://norkuj.cz/vids/export1.mp4',
     mediaType: 'video',
   },
   {
     title: '_tour_slide3_title',
     description: '_tour_slide3_desc',
-    mediaUrl: '',
-    mediaType: 'video',
-  },
-  {
-    title: '_tour_slide4_title',
-    description: '_tour_slide4_desc',
-    mediaUrl: '',
+    mediaUrl: 'https://norkuj.cz/vids/export2.mp4',
     mediaType: 'video',
   },
   {
     title: '_tour_slide5_title',
     description: '_tour_slide5_desc',
-    mediaUrl: '',
+    mediaUrl: 'https://norkuj.cz/vids/export3.mp4',
     mediaType: 'video',
   },
   {
     title: '_tour_slide6_title',
     description: '_tour_slide6_desc',
-    mediaUrl: '',
+    mediaUrl: 'https://norkuj.cz/vids/export4.mp4',
     mediaType: 'video',
   },
 ]
@@ -98,13 +86,14 @@ export function FeatureTour({ open, onClose }: Props) {
         padding: 20,
       }}>
       <div style={{
-        width: 'min(90%, 720px)',
-        maxHeight: '90vh',
+        width: window.innerWidth < 768 ? '100%' : 'min(90%, 720px)',
+        maxHeight: window.innerWidth < 768 ? '100dvh' : '90vh',
+        height: window.innerWidth < 768 ? '100dvh' : undefined,
         background: 'var(--c-surface)',
-        borderRadius: 16,
+        borderRadius: window.innerWidth < 768 ? 0 : 16,
         display: 'flex', flexDirection: 'column',
         overflow: 'hidden',
-        boxShadow: '0 24px 80px rgba(0,0,0,0.4)',
+        boxShadow: window.innerWidth < 768 ? 'none' : '0 24px 80px rgba(0,0,0,0.4)',
         position: 'relative',
       }}>
         {/* Close button */}
@@ -135,6 +124,7 @@ export function FeatureTour({ open, onClose }: Props) {
                 muted
                 playsInline
                 loop
+                preload='auto'
                 style={{ width: '100%', height: '100%', objectFit: 'contain' }}
               />
             ) : (

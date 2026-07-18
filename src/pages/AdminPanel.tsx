@@ -58,6 +58,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
   const [stats, setStats] = useState({ pending: 0, published: 0, rejected: 0, total: 0 })
   const { t } = useLang()
   const [actionMsg, setActionMsg] = useState<string | null>(null)
+  const isMobile = window.innerWidth < 768
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data, error }) => {
@@ -270,8 +271,15 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
   ]
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 70, padding: 16 }}>
-      <div style={{ width: '92%', maxWidth: 1100, height: '90vh', background: 'var(--c-bg)', borderRadius: 16, display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 24px 64px rgba(0,0,0,0.35)' }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 70, padding: window.innerWidth < 768 ? 0 : 16 }}>
+      <div style={{
+        width: '100%', maxWidth: 1100,
+        height: window.innerWidth < 768 ? '100%' : '90vh',
+        background: 'var(--c-bg)',
+        borderRadius: window.innerWidth < 768 ? 0 : 16,
+        display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        boxShadow: window.innerWidth < 768 ? 'none' : '0 24px 64px rgba(0,0,0,0.35)',
+      }}>
 
         {/* Header */}
         <div style={{ background: 'var(--c-surface)', borderBottom: '1px solid var(--c-border)', padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
@@ -303,8 +311,13 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
 
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
 
-          {/* List */}
-          <div style={{ width: 340, borderRight: '1px solid var(--c-border)', overflow: 'auto', flexShrink: 0, background: 'var(--c-surface)' }}>
+          {/* List — full width on mobile */}
+          <div style={{
+            width: isMobile ? '100%' : 340,
+            borderRight: isMobile ? 'none' : '1px solid var(--c-border)',
+            overflow: 'auto', flexShrink: 0, background: 'var(--c-surface)',
+            display: isMobile && selected ? 'none' : 'block',
+          }}>
             {loading && (
               <div style={{ padding: 24, display: 'flex', justifyContent: 'center' }}>
                 <div style={{ width: 20, height: 20, borderRadius: '50%', border: '2px solid #7c3aed', borderTopColor: 'transparent', animation: 'spin 0.7s linear infinite' }} />
@@ -349,7 +362,17 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
 
           {/* Detail */}
           {selected ? (
-            <div style={{ flex: 1, overflow: 'auto', padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ flex: 1, overflow: 'auto', padding: isMobile ? 16 : 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Mobile back-to-list button */}
+              {isMobile && (
+                <button onClick={() => setSelected(null)}
+                  style={{
+                    alignSelf: 'flex-start', padding: '8px 14px', border: '1px solid var(--c-border)',
+                    borderRadius: 8, background: 'var(--c-surface)', cursor: 'pointer', fontSize: 13, color: 'var(--c-text)',
+                  }}>
+                  ← {t('_admin_select_prompt').replace('Vyber inzerát ze seznamu','Zpět na seznam').replace('Select a listing from the list','Back to list')}
+                </button>
+              )}
 
               {selected.image_paths.length > 0 && (
                 <div style={{ height: 200, borderRadius: 10, overflow: 'hidden' }}>
