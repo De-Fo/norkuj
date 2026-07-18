@@ -3,7 +3,7 @@
 **Open-source P2P rental platform for Czech Republic.** Zero broker fees, zero agency spam.  
 Find your next apartment by Metro/Tram lines, districts, or travel time by public transport.
 
-> 🚀 **Demo:** https://norkuj.cz (coming soon)  
+> 🚀 **Live:** https://norkuj.cz
 > 📦 **Stack:** React 19 + TypeScript + Vite + Supabase + MapLibre GL + PostGIS
 
 ---
@@ -154,38 +154,6 @@ VITE_MAPTILER_KEY          # MapTiler API key
 
 ---
 
-## Project Structure
-
-```
-src/
-├── App.tsx                  # Root component + router
-├── components/
-│   ├── FilterPanel.tsx      # Search filters UI
-│   ├── Footer.tsx           # Site footer
-│   ├── ListingCard.tsx      # Listing preview card
-│   ├── Map.tsx              # MapLibre GL map wrapper
-│   └── SearchFilters.tsx    # Search + Sort toolbar
-├── lib/
-│   ├── district_polygons.ts # Prague district boundary coordinates
-│   ├── districts.ts         # District groups + point-in-polygon
-│   ├── isochrone.ts         # Client-side point-in-polygon
-│   ├── lang.tsx             # i18n hook (CS/EN)
-│   ├── supabase.ts          # Supabase client setup
-│   ├── types.ts             # TypeScript types
-│   ├── utils.ts             # Utilities (formatting, image URLs)
-│   └── validation.ts        # Form validation rules
-└── pages/
-    ├── AdminPanel.tsx       # Admin approval dashboard
-    ├── Auth.tsx             # Login/Register/Forgot password
-    ├── CreateListing.tsx    # New listing form
-    ├── ListingDetail.tsx    # Full listing view
-    ├── MyListings.tsx       # User's own listings
-    ├── Profile.tsx          # User profile editor
-    └── Search.tsx           # Main search + map page
-```
-
----
-
 ## Contributing
 
 PRs welcome! Open an issue first for bigger features.
@@ -200,7 +168,7 @@ PRs welcome! Open an issue first for bigger features.
 
 ## License
 
-MIT © [De-Fo](https://github.com/De-Fo)
+AGPL © [De-Fo](https://github.com/De-Fo)
 
 ---
 
