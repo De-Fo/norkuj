@@ -3,7 +3,7 @@
 **Open-source P2P rental platform for Czech Republic.** Zero broker fees, zero agency spam.  
 Find your next apartment by Metro/Tram lines, districts, or travel time by public transport.
 
-> 🚀 **Live:** https://norkuj.cz
+> 🚀 **Live:** https://norkuj.cz   
 > 📦 **Stack:** React 19 + TypeScript + Vite + Supabase + MapLibre GL + PostGIS
 
 ---
@@ -49,6 +49,15 @@ Find your next apartment by Metro/Tram lines, districts, or travel time by publi
 
 ---
 
+## Limitations
+- Some schema/seed files were too large for GitHub and are not included. 
+  Transit data (`shapes`, `stop_times`, `bus_times`) can be regenerated 
+  from PID's public GTFS feeds.
+  
+- The live Supabase schema has diverged from `supabase/schema.sql` due to 
+  direct dashboard edits during early development. The committed schema 
+  may not exactly match production yet.
+
 ## Tech Stack
 
 | Layer      | Technology                                                    |
@@ -73,7 +82,7 @@ Find your next apartment by Metro/Tram lines, districts, or travel time by publi
 
 ```bash
 # 1. Clone & install
-git clone https://github.com/yourusername/norkuj
+git clone https://github.com/de-fo/norkuj
 cd norkuj
 npm install
 
@@ -150,7 +159,7 @@ Performance: ~34 ms (10 min) to ~2.5 s (60 min). Loading state is shown during c
 VITE_SUPABASE_URL          # https://[project].supabase.co
 VITE_SUPABASE_ANON_KEY     # Anon/publishable key (NOT service_role)
 VITE_MAPTILER_KEY          # MapTiler API key
-/```
+```
 
 ---
 
