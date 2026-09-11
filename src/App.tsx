@@ -1,27 +1,34 @@
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useLayoutEffect, useState, useRef, useCallback, lazy, Suspense } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
 import { SearchPage } from './pages/Search'
-import { AuthPage } from './pages/Auth'
-import { CreateListingPage } from './pages/CreateListing'
-import { ListingDetail } from './pages/ListingDetail'
-import { AdminPanel } from './pages/AdminPanel'
-import { CompareBezrealitkyPage } from './pages/CompareBezrealitky'
-import { CompareUlovdomovPage } from './pages/CompareUlovdomov'
+import { districtForSlug } from './lib/districts'
 import { Wordmark } from './components/Wordmark'
-import { ProfilePage } from './pages/Profile'
 import type { SearchFilters } from './lib/types'
 import { DEFAULT_FILTERS } from './lib/types'
-import { MyListingsPage } from './pages/MyListings'
 import type { Listing } from './lib/types'
 import { useLang } from './lib/lang'
+import { registerPushWorker } from './lib/push'
 import { CookieConsent } from './components/CookieConsent'
 import { FeatureTour, isFirstVisit, markTourSeen } from './components/FeatureTour'
 import { usePageMeta } from './lib/seo'
 import { getImageUrl } from './lib/utils'
 
+const DistrictPage = lazy(() => import('./pages/DistrictPage').then(m => ({ default: m.DistrictPage })))
+
+// Secondary pages load on demand — keeps the map-heavy home view lean on first paint.
+const AuthPage = lazy(() => import('./pages/Auth').then(m => ({ default: m.AuthPage })))
+const CreateListingPage = lazy(() => import('./pages/CreateListing').then(m => ({ default: m.CreateListingPage })))
+const ListingDetail = lazy(() => import('./pages/ListingDetail').then(m => ({ default: m.ListingDetail })))
+const AdminPanel = lazy(() => import('./pages/AdminPanel').then(m => ({ default: m.AdminPanel })))
+const CompareBezrealitkyPage = lazy(() => import('./pages/CompareBezrealitky').then(m => ({ default: m.CompareBezrealitkyPage })))
+const CompareUlovdomovPage = lazy(() => import('./pages/CompareUlovdomov').then(m => ({ default: m.CompareUlovdomovPage })))
+const WatchCatPage = lazy(() => import('./pages/WatchCatPage').then(m => ({ default: m.WatchCatPage })))
+const ProfilePage = lazy(() => import('./pages/Profile').then(m => ({ default: m.ProfilePage })))
+const MyListingsPage = lazy(() => import('./pages/MyListings').then(m => ({ default: m.MyListingsPage })))
+
 type Theme = 'light' | 'dark'
-type Route = 'search' | 'auth' | 'profile' | 'my-listings' | 'favorites' | 'compare-bezrealitky' | 'compare-ulovdomov'
+type Route = 'search' | 'auth' | 'profile' | 'my-listings' | 'favorites' | 'watchcats' | 'compare-bezrealitky' | 'compare-ulovdomov' | 'district'
 
 function getInitialTheme(): Theme {
   const stored = localStorage.getItem('norkuj-theme')
@@ -47,8 +54,16 @@ export default function App() {
     return null
   }
 
+  const parseDistrictSlug = (): string | null => {
+    const m = window.location.pathname.match(/^\/bydleni\/([a-z0-9-]+)\/?$/i)
+    if (!m) return null
+    return districtForSlug(m[1])
+  }
+
   const [user, setUser] = useState<User | null>(null)
-  const [route, setRoute] = useState<Route>(() => parseComparePath() ?? 'search')
+  const [route, setRoute] = useState<Route>(() => parseComparePath() ?? (parseDistrictSlug() ? 'district' : 'search'))
+  const [districtSlug, setDistrictSlug] = useState<string | null>(() => parseDistrictSlug())
+  const goHome = () => { setRoute('search'); setDistrictSlug(null); window.history.replaceState(null, '', '/') }
   const [authLoading, setAuthLoading] = useState(true)
   const [filters, setFilters] = useState<SearchFilters>(DEFAULT_FILTERS)
   const [showMap, setShowMap] = useState(true)
@@ -56,12 +71,19 @@ export default function App() {
   const [showAdmin, setShowAdmin] = useState(false)
   const [selectedListingId, setSelectedListingId] = useState<string | null>(parseListingIdFromPath)
   const [editingListing, setEditingListing] = useState<Listing | null>(null)
+  const [relistFrom, setRelistFrom] = useState<Listing | null>(null)
   const [theme, setTheme] = useState<Theme>(getInitialTheme)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
   const [favoritesIds, setFavoritesIds] = useState<Set<string>>(new Set())
   const [tourOpen, setTourOpen] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [watchcatsOpenComposer, setWatchcatsOpenComposer] = useState(false)
   const { t, lang, setLang } = useLang()
+
+  // #root is hidden in the prerendered HTML (SEO text) until the SPA commits.
+  useLayoutEffect(() => {
+    document.getElementById('root')!.style.display = ''
+  }, [])
 
   // ── Theme ──
   useEffect(() => {
@@ -84,7 +106,7 @@ export default function App() {
       // history.back() triggers popstate which clears selectedListingId
       window.history.back()
     } else {
-      // Direct load or refresh at /listing/{id} - replace URL silently
+      // direct-load/refresh at /listing/{id}: drop the path, keep modal open state
       if (parseListingIdFromPath()) {
         window.history.replaceState(null, '', '/')
       }
@@ -108,9 +130,7 @@ export default function App() {
     return () => window.removeEventListener('popstate', onPop)
   }, [])
 
-  // If loaded directly at /listing/{id}, leave listingUrlRef false so
-  // closeListing uses replaceState instead of history.back() (which would
-  // navigate away entirely on a direct-load page)
+  // Direct /listing/{id} load: close replaces URL instead of history.back()
   useEffect(() => {
     if (selectedListingId && parseListingIdFromPath()) {
       listingUrlRef.current = false
@@ -151,6 +171,11 @@ export default function App() {
     }
   }, [])
 
+  // Register the push service worker at startup (no-op when unsupported).
+  useEffect(() => {
+    registerPushWorker().catch(() => {})
+  }, [])
+
   // ── Favorites ──
   useEffect(() => {
     if (!user) { setFavoritesIds(new Set()); setIsAdmin(false); return }
@@ -183,7 +208,7 @@ export default function App() {
   }
 
   // ═══ SEO: update document head per route ═══
-  usePageMeta(route, selectedListingId)
+  usePageMeta(route, selectedListingId, districtSlug)
 
   // ── Loading spinner ──
   if (authLoading) return (
@@ -193,30 +218,72 @@ export default function App() {
   )
 
   // ── Route pages ──
+  const routeFallback = (
+    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--c-faint)', fontSize: 13 }}>
+      {t('loading')}
+    </div>
+  )
+
   if (route === 'my-listings') {
     return (
-      <MyListingsPage
+      <Suspense fallback={routeFallback}><MyListingsPage
         user={user}
         onBack={() => setRoute('search')}
         onEdit={(listing) => {
           setEditingListing(listing)
+          setRelistFrom(null)
           setShowCreate(true)
           setRoute('search')
         }}
-      />
+        onRelist={(listing) => {
+          setRelistFrom(listing)
+          setEditingListing(null)
+          setShowCreate(true)
+          setRoute('search')
+        }}
+      /></Suspense>
     )
   }
 
-  if (route === 'auth') return <AuthPage onBack={() => setRoute('search')} />
-  if (route === 'profile') return <ProfilePage user={user} onBack={() => setRoute('search')} />
-  if (route === 'compare-bezrealitky') return <CompareBezrealitkyPage onGoHome={() => {
-    setRoute('search')
-    window.history.replaceState(null, '', '/')
-  }} />
-  if (route === 'compare-ulovdomov') return <CompareUlovdomovPage onGoHome={() => {
-    setRoute('search')
-    window.history.replaceState(null, '', '/')
-  }} />
+  if (route === 'watchcats') {
+    if (!user) {
+      return (
+        <div style={{ flex: 1, overflow: 'auto', padding: 32, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, textAlign: 'center' }}>
+          <div style={{ fontSize: 40 }}>🐱</div>
+          <h2 style={{ fontSize: 18, margin: 0, color: 'var(--c-text)' }}>{t('watchcats_title')}</h2>
+          <p style={{ color: 'var(--c-muted)', fontSize: 14, maxWidth: 320, margin: 0 }}>{t('watchcats_login_hint')}</p>
+          <button onClick={() => setRoute('auth')} style={{ padding: '10px 22px', borderRadius: 9, border: 'none', background: 'var(--c-accent, #2563eb)', color: '#fff', fontSize: 14, cursor: 'pointer' }}>
+            {t('login')}
+          </button>
+        </div>
+      )
+    }
+    return (
+      <Suspense fallback={routeFallback}><WatchCatPage
+        user={user}
+        currentFilters={filters}
+        openComposer={watchcatsOpenComposer}
+        onComposerConsumed={() => setWatchcatsOpenComposer(false)}
+        onGoHome={goHome}
+        onApply={(f) => { setFilters(f); setRoute('search') }}
+        onListingClick={(id) => { setSelectedListingId(id); setRoute('search') }}
+        isMobile={isMobile}
+        isAdmin={isAdmin}
+      /></Suspense>
+    )
+  }
+  if (route === 'auth') return <Suspense fallback={routeFallback}><AuthPage onBack={() => setRoute('search')} /></Suspense>
+  if (route === 'profile') return <Suspense fallback={routeFallback}><ProfilePage user={user} onBack={() => setRoute('search')} /></Suspense>
+  if (route === 'compare-bezrealitky') return <Suspense fallback={routeFallback}><CompareBezrealitkyPage onGoHome={goHome} /></Suspense>
+  if (route === 'compare-ulovdomov') return <Suspense fallback={routeFallback}><CompareUlovdomovPage onGoHome={goHome} /></Suspense>
+
+  if (route === 'district' && districtSlug) {
+    return <Suspense fallback={routeFallback}><DistrictPage
+      district={districtSlug}
+      onGoHome={goHome}
+      onListingClick={(id) => { setSelectedListingId(id); setRoute('search') }}
+    /></Suspense>
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden' }}>
@@ -234,6 +301,22 @@ export default function App() {
         </button>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 3 : 5 }}>
+          <div style={{ position: 'relative', display: 'inline-block' }}>
+            <button
+              onClick={() => { if (user) setRoute('watchcats'); else setRoute('auth') }}
+              aria-label={t('watchcats_title')}
+              className="wc-btn"
+              title={t('watchcats_title')}
+              style={{
+                height: 32, padding: isMobile ? 0 : '0 10px', background: 'transparent',
+                border: '1px solid var(--c-border)', borderRadius: 7, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                color: 'var(--c-muted)', fontSize: 14, flexShrink: 0,
+              }}>
+              🐱
+              {!isMobile && <span style={{ fontSize: 12, whiteSpace: 'nowrap', color: 'var(--c-text)' }}>{t('watchcats_header')}</span>}
+            </button>
+          </div>
           {user && (
             <button onClick={() => setRoute('favorites')} title={t('favorites_title')} aria-label={t('favorites_title')}
               style={{
@@ -415,31 +498,42 @@ export default function App() {
             onListingClick={openListing}
             isMobile={isMobile}
             isochroneAutoShowMap={() => { if (isMobile) setShowMap(true) }}
+            onSaveFilters={() => {
+              if (user) { setWatchcatsOpenComposer(true); setRoute('watchcats') }
+              else setRoute('auth')
+            }}
           />
         )}
       </main>
 
       {/* ═══ MODALS ═══ */}
       {showCreate && (
-        <CreateListingPage
-          onDone={() => { setShowCreate(false); setEditingListing(null) }}
-          editListing={editingListing}
-        />
+        <Suspense fallback={null}>
+          <CreateListingPage
+            onDone={() => { setShowCreate(false); setEditingListing(null); setRelistFrom(null) }}
+            editListing={editingListing}
+            relistFrom={relistFrom}
+          />
+        </Suspense>
       )}
 
       {selectedListingId && (
-        <ListingDetail
-          listingId={selectedListingId}
-          onClose={closeListing}
-          onRequestAuth={() => setRoute('auth')}
-          user={user}
-          isFavorited={favoritesIds.has(selectedListingId)}
-          onToggleFavorite={toggleFavorite}
-        />
+        <Suspense fallback={null}>
+          <ListingDetail
+            listingId={selectedListingId}
+            onClose={closeListing}
+            onRequestAuth={() => setRoute('auth')}
+            user={user}
+            isFavorited={favoritesIds.has(selectedListingId)}
+            onToggleFavorite={toggleFavorite}
+          />
+        </Suspense>
       )}
 
       {showAdmin && (
-        <AdminPanel onClose={() => setShowAdmin(false)} />
+        <Suspense fallback={null}>
+          <AdminPanel onClose={() => setShowAdmin(false)} />
+        </Suspense>
       )}
 
       {/* ═══ Cookie consent ═══ */}
@@ -533,6 +627,7 @@ function FavoritesPage({ listingIds, onSelectListing, onBack }: {
     setLoading(true)
     supabase.from('listings').select('id, title, price_total_czk, property_type, area_sqm, address_district, available_from, image_paths')
       .in('id', listingIds)
+      .eq('status', 'published')   // deleted/rented vanish from favorites for everyone (incl. admin RLS bypass)
       .then(({ data, error }) => {
         if (error && import.meta.env.DEV) console.error('[favorites listings]', error)
         setListings(data ?? [])

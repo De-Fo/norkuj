@@ -87,7 +87,7 @@ export function CookieConsent() {
     }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         <span style={{ fontWeight: 600 }}>
-          🍪 {t('_cookies_title')}
+          {t('_cookies_title')}
         </span>
         <span style={{ color: 'var(--c-muted, #64748b)' }}>
           {t('_cookies_text')}

@@ -43,7 +43,7 @@ const EMPTY: FormData = {
   lat: null, lng: null, images: [],
 }
 
-const PROPERTY_TYPES: PropertyType[] = ['pokoj','1+kk','1+1','2+kk','2+1','3+kk','3+1','4+kk','4+1','atypical']
+const PROPERTY_TYPES: PropertyType[] = ['pokoj','sdileny_pokoj','1+kk','1+1','2+kk','2+1','3+kk','3+1','4+kk','4+1','5+kk','5+1','6+kk','6+1','atypical']
 const DISTRICTS = ALL_DISTRICTS
 
 const inp: React.CSSProperties = {
@@ -75,36 +75,40 @@ interface Props {
   onDone: () => void          // close modal entirely (after success or explicit cancel)
   onMinimize?: () => void     // hide but keep state (X button while editing)
   editListing?: Listing | null
+  relistFrom?: Listing | null // relist mode: prefill from a previous rented/closed listing and create a NEW row
 }
 
-export function CreateListingPage({ onDone, editListing }: Props) {
+export function CreateListingPage({ onDone, editListing, relistFrom }: Props) {
   const [step, setStep] = useState(0)
+  const src = relistFrom ?? editListing
   const [form, setForm] = useState<FormData>(() =>
-    editListing ? {
-      title: editListing.title,
-      description: editListing.description,
-      property_type: editListing.property_type,
-      price_czk: String(editListing.price_czk),
-      utilities_czk: String(editListing.utilities_czk),
-      deposit_czk: editListing.deposit_czk ? String(editListing.deposit_czk) : '',
-      area_sqm: String(editListing.area_sqm),
-      floor: editListing.floor != null ? String(editListing.floor) : '',
-      available_from: editListing.available_from,
-      min_lease_months: String(editListing.min_lease_months),
-      furnished: editListing.furnished,
-      pets_allowed: editListing.pets_allowed,
-      parking: editListing.parking,
-      balcony: editListing.balcony,
-      cellar: editListing.cellar,
-      address_street: editListing.address_street,
-      address_districts: (editListing.address_district ?? '').split(',').map((s: string) => s.trim()).filter(Boolean),
-      lat: null, // re-select on map; existing geography not easily reversed client-side
-      lng: null,
+    src ? {
+      title: src.title,
+      description: src.description,
+      property_type: src.property_type,
+      price_czk: String(src.price_czk),
+      utilities_czk: String(src.utilities_czk),
+      deposit_czk: src.deposit_czk ? String(src.deposit_czk) : '',
+      area_sqm: String(src.area_sqm),
+      floor: src.floor != null ? String(src.floor) : '',
+      available_from: src.available_from,
+      min_lease_months: String(src.min_lease_months),
+      furnished: src.furnished,
+      pets_allowed: src.pets_allowed,
+      parking: src.parking,
+      balcony: src.balcony,
+      cellar: src.cellar,
+      address_street: src.address_street,
+      address_districts: (src.address_district ?? '').split(',').map((s: string) => s.trim()).filter(Boolean),
+      lat: src?.location?.coordinates?.[1] ?? null,   // preserve the old pin so relist needs no re-pick
+      lng: src?.location?.coordinates?.[0] ?? null,
       images: [],
     } : EMPTY
   )
   const { t } = useLang()
   const isEdit = !!editListing
+  const isRelist = !!relistFrom
+  const srcListing = src   // the listing the form was prefilled from (edit target or relist origin)
   const [uploading, setUploading] = useState(false)
   const [convertingHeic, setConvertingHeic] = useState(false)
   const [removedExistingPaths, setRemovedExistingPaths] = useState<Set<string>>(new Set())
@@ -119,8 +123,8 @@ export function CreateListingPage({ onDone, editListing }: Props) {
       case 1: return !!f.price_czk && parseInt(f.price_czk) > 0
       case 2: return !!(f.address_street.trim().length >= 3 && f.lat != null && f.lng != null)
       case 3: {
-        const existingCount = isEdit
-          ? (editListing!.image_paths ?? []).filter(p => !removedExistingPaths.has(p)).length
+        const existingCount = srcListing
+          ? (srcListing.image_paths ?? []).filter(p => !removedExistingPaths.has(p)).length
           : 0
         return existingCount + form.images.length > 0
       }
@@ -226,22 +230,26 @@ export function CreateListingPage({ onDone, editListing }: Props) {
       if (!user) throw new Error(t('_create_error_auth'))
       if (!form.lat || !form.lng) throw new Error(t('_create_error_location'))
 
-      const existingPaths: string[] = isEdit
-        ? (editListing!.image_paths ?? []).filter(p => !removedExistingPaths.has(p))
+      const existingPaths: string[] = srcListing
+        ? (srcListing.image_paths ?? []).filter(p => !removedExistingPaths.has(p))
         : []
       const totalImageCount = existingPaths.length + form.images.length
       if (totalImageCount === 0) {
         throw new Error(t('_create_photos_required'))
       }
 
-      // Delete removed images from storage
-      if (isEdit && removedExistingPaths.size > 0) {
-        await supabase.storage.from('listing-images').remove(Array.from(removedExistingPaths))
+      // Delete removed images from storage (only paths the owner actually owns).
+      // Never delete origin paths during a relist — the rented/closed listing is
+      // kept intact, so its storage references must stay valid.
+      if (isEdit && !isRelist && removedExistingPaths.size > 0) {
+        const owned = Array.from(removedExistingPaths).filter(p => p.startsWith(user.id + '/'))
+        await supabase.storage.from('listing-images').remove(owned)
       }
 
       const imagePaths: string[] = [...existingPaths]
       for (const file of form.images) {
-        const path = `${user.id}/${Date.now()}_${file.name.replace(/\s+/g, '_')}`
+        const safeName = file.name.replace(/[\/\\\.\.\x00-\x1f]/g, '_').replace(/\s+/g, '_')
+        const path = `${user.id}/${Date.now()}_${safeName}`
         const { error: upErr } = await supabase.storage.from('listing-images').upload(path, file)
         if (upErr) throw new Error(t('_create_error_upload') + upErr.message)
         imagePaths.push(path)
@@ -277,7 +285,7 @@ export function CreateListingPage({ onDone, editListing }: Props) {
         image_paths: imagePaths,
       }
 
-      if (isEdit) {
+      if (isEdit && !isRelist) {
         const { error: updErr } = await (supabase.from('listings') as any)
           .update({
             ...payload,
@@ -288,8 +296,19 @@ export function CreateListingPage({ onDone, editListing }: Props) {
           .eq('owner_id', user.id)
         if (updErr) throw updErr
       } else {
+        // Relist keeps the old (rented/closed) listing intact and creates a NEW
+        // row that goes through the same review pipeline. published_count carries
+        // the history forward so the admin panel can show prior publications.
         const { error: insErr } = await (supabase.from('listings') as any)
-          .insert([{ ...payload, owner_id: user.id, status: 'pending_review' }])
+          .insert([{
+            ...payload,
+            owner_id: user.id,
+            status: 'pending_review',
+            ...(isRelist ? {
+              relisted_from: relistFrom?.id ?? null,
+              published_count: (relistFrom?.published_count || 1) + 1,
+            } : {}),
+          }])
         if (insErr) throw insErr
       }
 
@@ -397,10 +416,12 @@ export function CreateListingPage({ onDone, editListing }: Props) {
                     <div>
                       <label style={label}>{t('_create_title_label')}</label>
                       <input style={inp} placeholder={t('_create_title_placeholder')} value={form.title} onChange={e => set({ title: e.target.value })} />
+                      <TitleCounter text={form.title} />
                     </div>
                     <div>
                       <label style={label}>{t('_create_desc_label')}</label>
                       <textarea style={{ ...inp, minHeight: 120, resize: 'vertical' }} placeholder={t('_create_desc_placeholder')} value={form.description} onChange={e => set({ description: e.target.value })} />
+                      <DescCounter text={form.description} />
                     </div>
                     <div>
                       <label style={label}>{t('_create_type_label')}</label>
@@ -571,13 +592,13 @@ export function CreateListingPage({ onDone, editListing }: Props) {
                       </label>
 
                       {/* Existing photos (edit mode) — with remove buttons */}
-                      {isEdit && (editListing!.image_paths ?? []).length > 0 && (
+                      {(isEdit || isRelist) && (srcListing?.image_paths ?? []).length > 0 && (
                         <>
                           <p style={{ fontSize: 11, color: 'var(--c-muted)', marginTop: 4 }}>
-                            {t('_create_photos_existing')} ({(editListing!.image_paths ?? []).filter(p => !removedExistingPaths.has(p)).length})
+                            {t('_create_photos_existing')} ({(srcListing?.image_paths ?? []).filter(p => !removedExistingPaths.has(p)).length})
                           </p>
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-                            {(editListing!.image_paths ?? []).map((path: string) => {
+                            {(srcListing?.image_paths ?? []).map((path: string) => {
                               const isRemoved = removedExistingPaths.has(path)
                               if (isRemoved) return null
                               return (
@@ -585,7 +606,7 @@ export function CreateListingPage({ onDone, editListing }: Props) {
                                   <img src={getImageUrl(path)} alt={t('_create_photos_existing')}
                                     style={{ width: '100%', height: 80, objectFit: 'cover', borderRadius: 8 }} />
                                   <button aria-label={t('_create_photos_remove')} onClick={() => {
-                                    if ((editListing!.image_paths ?? []).filter(p => !removedExistingPaths.has(p)).length <= 1) {
+                                    if ((srcListing?.image_paths ?? []).filter(p => !removedExistingPaths.has(p)).length <= 1) {
                                       const keep = confirm(t('_create_photos_last_confirm'))
                                       if (!keep) return
                                     }
@@ -603,7 +624,7 @@ export function CreateListingPage({ onDone, editListing }: Props) {
                       )}
 
                       {/* Removed photos placeholder */}
-                      {isEdit && removedExistingPaths.size > 0 && (
+                      {(isEdit || isRelist) && removedExistingPaths.size > 0 && (
                         <p style={{ fontSize: 11, color: 'var(--c-faint)', marginTop: -8 }}>
                           {removedExistingPaths.size} {t('_create_photos_removed')}
                           <button onClick={() => setRemovedExistingPaths(new Set())}
@@ -619,9 +640,9 @@ export function CreateListingPage({ onDone, editListing }: Props) {
 
                       {/* Validation */}
                       {(() => {
-                        const existingCount = isEdit
-                          ? (editListing!.image_paths ?? []).filter(p => !removedExistingPaths.has(p)).length
-                          : 0
+                        const existingCount = srcListing
+                        ? (srcListing.image_paths ?? []).filter(p => !removedExistingPaths.has(p)).length
+                        : 0
                         if (existingCount + form.images.length === 0) {
                           return <p style={{ fontSize: 11, color: 'var(--c-red)', marginTop: 4 }}>{t('_create_photos_required')}</p>
                         }
@@ -650,9 +671,14 @@ export function CreateListingPage({ onDone, editListing }: Props) {
                 {step === 4 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                     <h3 style={{ fontSize: 15, fontWeight: 600 }}>{t('_create_review_title')}</h3>
-                    {isEdit && (
+                    {isEdit && !isRelist && (
                       <div style={{ padding: '10px 12px', background: 'var(--c-bg)', border: '1px solid var(--c-yellow)', borderRadius: 8, fontSize: 12, color: 'var(--c-muted)' }}>
                         {t('_create_edit_warning')}
+                      </div>
+                    )}
+                    {isRelist && (
+                      <div style={{ padding: '10px 12px', background: 'color-mix(in srgb, var(--c-accent) 8%, transparent)', border: '1px solid var(--c-accent)', borderRadius: 8, fontSize: 12, color: 'var(--c-muted)' }}>
+                        {t('_create_relist_warning')}
                       </div>
                     )}
                     {[
@@ -671,7 +697,7 @@ export function CreateListingPage({ onDone, editListing }: Props) {
                       </div>
                     ))}
                     {error && (
-                      <div style={{ padding: '10px 12px', background: 'color-mix(in srgb, var(--c-red) 15%, transparent)', borderRadius: 8, color: 'var(--c-red)', fontSize: 12 }}>
+                      <div style={{ padding: '10px 12px', background: 'color-mix(in srgb, var(--c-red) 12%, transparent)', borderRadius: 8, color: 'var(--c-red)', fontSize: 12 }}>
                         {error}
                       </div>
                     )}
@@ -702,7 +728,7 @@ export function CreateListingPage({ onDone, editListing }: Props) {
                     background: uploading ? 'var(--c-border-md)' : allValid ? 'var(--c-green)' : 'var(--c-border-md)',
                     color: allValid && !uploading ? 'white' : 'var(--c-faint)',
                     fontSize: 13, fontWeight: 500, cursor: uploading || !allValid ? 'not-allowed' : 'pointer',
-                  }}>{uploading ? t('_create_submitting') : isEdit ? t('_create_submit_edit') : t('_create_submit')}
+                  }}>{uploading ? t('_create_submitting') : isEdit ? t('_create_submit_edit') : isRelist ? t('_create_submit_relist') : t('_create_submit')}
                 </button>
               }
             </div>
@@ -711,4 +737,61 @@ export function CreateListingPage({ onDone, editListing }: Props) {
       </div>
     </div>
   )
-} 
+}
+
+// Uses trimmed length (same rule as stepValid) so the count never disagrees with validation.
+const DESC_MAX = 5000
+const DESC_MIN = 20
+const TITLE_MAX = 120
+const TITLE_MIN = 10
+
+function LiveCounter({ text, max, min, minHint, minOk, overHint }: {
+  text: string
+  max: number
+  min: number
+  minHint: string
+  minOk: string
+  overHint: string
+}) {
+  const len = text.trim().length
+  const over = len > max
+  const under = len < min
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+      <span style={{ fontSize: 11, lineHeight: 1.4, color: under ? 'var(--c-red)' : 'var(--c-muted)' }}>
+        {under ? `${len}/${min} ${minHint}` : minOk}
+      </span>
+      <span style={{ fontSize: 11, lineHeight: 1.4, color: over ? 'var(--c-red)' : 'var(--c-muted)' }}>
+        {over ? `${overHint} ${len}/${max}` : `${len}/${max}`}
+      </span>
+    </div>
+  )
+}
+
+function DescCounter({ text }: { text: string }) {
+  const { t } = useLang()
+  return (
+    <LiveCounter
+      text={text}
+      max={DESC_MAX}
+      min={DESC_MIN}
+      minHint={t('_create_desc_min')}
+      minOk={t('_create_desc_min_ok')}
+      overHint={t('_create_desc_over')}
+    />
+  )
+}
+
+function TitleCounter({ text }: { text: string }) {
+  const { t } = useLang()
+  return (
+    <LiveCounter
+      text={text}
+      max={TITLE_MAX}
+      min={TITLE_MIN}
+      minHint={t('_create_title_min')}
+      minOk={t('_create_title_min_ok')}
+      overHint={t('_create_title_over')}
+    />
+  )
+}

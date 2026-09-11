@@ -1,8 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { Wordmark } from '../components/Wordmark'
 import { useLang } from '../lib/lang'
 import { mapError } from '../lib/errors'
+import { TurnstileWidget } from '../components/TurnstileWidget'
+
+const SITE_KEY_ACTIVE = Boolean(import.meta.env.VITE_TURNSTILE_SITE_KEY)
 
 type Mode = 'login' | 'register' | 'reset'
 
@@ -26,6 +29,10 @@ export function AuthPage({ onBack }: Props) {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [newPassword, setNewPassword] = useState('')
   const [recoveryMode, setRecoveryMode] = useState(false)
+  const captchaTokenRef = useRef('')
+  const setCaptchaToken = (tok: string) => { captchaTokenRef.current = tok }
+  const [captchaReady, setCaptchaReady] = useState(false)
+  const [captchaEpoch, setCaptchaEpoch] = useState(0)
 
   // Detect Supabase password-recovery redirect (#access_token=...&type=recovery)
   useEffect(() => {
@@ -39,12 +46,20 @@ export function AuthPage({ onBack }: Props) {
   }, [])
 
   const handleSubmit = async () => {
+    const captchaToken = captchaTokenRef.current
+    // Only block on captcha when the site key is actually provisioned. If the
+    // widget never produced a token (script blocked / throttled / offline), let
+    // the request through so auth isn't bricked on a flaky network.
+    if (SITE_KEY_ACTIVE && !captchaToken) { setMsg({ ok: false, text: t('_captcha_pending') }); return }
+    setCaptchaReady(false) // the token below is single-use; re-roll for a retry
+    setCaptchaEpoch(e => e + 1)
     setLoading(true); setMsg(null)
+    try {
     if (mode === 'register') {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { display_name: displayName, phone } },
+        options: { data: { display_name: displayName, phone }, captchaToken },
       })
       if (error) { setMsg({ ok: false, text: mapError(error, t) }); setLoading(false); return }
       if (data?.user) {
@@ -55,11 +70,16 @@ export function AuthPage({ onBack }: Props) {
         setMsg({ ok: true, text: t('_auth_register_success') })
       }
     } else if (mode === 'login') {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+        options: { captchaToken },
+      })
       if (error) setMsg({ ok: false, text: mapError(error, t) })
     } else if (mode === 'reset') {
       const resetRedirect = window.location.origin + '/'
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        captchaToken,
         redirectTo: resetRedirect,
       })
       if (error) {
@@ -70,6 +90,10 @@ export function AuthPage({ onBack }: Props) {
       }
     }
     setLoading(false)
+    } catch (e: unknown) {
+      setLoading(false)
+      setMsg({ ok: false, text: mapError(e, t) })
+    }
   }
 
   const handleUpdatePassword = async () => {
@@ -177,9 +201,20 @@ export function AuthPage({ onBack }: Props) {
             <div style={{ fontSize: 12, color: msg.ok ? 'var(--c-green)' : 'var(--c-red)' }}>{msg.text}</div>
           )}
 
-          <button onClick={handleSubmit} disabled={loading} style={{ padding: '13px 0', background: 'var(--c-accent)', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer', minHeight: 44 }}>
-            {loading ? '...' : mode === 'login' ? t('_auth_submit_login') : mode === 'register' ? t('_auth_submit_register') : t('_auth_submit_reset')}
-          </button>
+          {loading ? <span style={{ textAlign: 'center', fontSize: 13, color: 'var(--c-muted)', minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>...</span> : (
+            <button onClick={handleSubmit} disabled={SITE_KEY_ACTIVE && !captchaReady}
+              style={{ padding: '13px 0', background: (!SITE_KEY_ACTIVE || captchaReady) ? 'var(--c-accent)' : 'var(--c-border-md)', color: (!SITE_KEY_ACTIVE || captchaReady) ? 'white' : 'var(--c-faint)', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: (!SITE_KEY_ACTIVE || captchaReady) ? 'pointer' : 'not-allowed', minHeight: 44 }}>
+              {mode === 'login' ? t('_auth_submit_login') : mode === 'register' ? t('_auth_submit_register') : t('_auth_submit_reset')}
+            </button>
+          )}
+
+          <TurnstileWidget
+            action={mode === 'register' ? 'register' : mode === 'login' ? 'login' : 'reset'}
+            resetKey={captchaEpoch}
+            onToken={setCaptchaToken}
+            onReady={() => setCaptchaReady(true)}
+            onError={() => { setCaptchaReady(false); setCaptchaToken('') }}
+          />
 
           {mode === 'reset' && (
             <button onClick={() => { setMode('login'); setMsg(null) }}
@@ -190,6 +225,17 @@ export function AuthPage({ onBack }: Props) {
 
           {mode !== 'reset' && (
             <>
+              {/* Informative consent text — no registration possible without agreeing */}
+              <p style={{ fontSize: 11, lineHeight: 1.55, color: 'var(--c-muted)', textAlign: 'center', margin: '2px 0 0' }}>
+                {t('_auth_consent_prefix')}{' '}
+                <a href={t('_auth_consent_terms_url')} target="_blank" rel="noopener noreferrer"
+                  style={{ color: 'var(--c-accent)', textDecoration: 'none' }}>{t('_auth_consent_terms')}</a>{' '}
+                {t('_auth_consent_and')}{' '}
+                <a href={t('_auth_consent_privacy_url')} target="_blank" rel="noopener noreferrer"
+                  style={{ color: 'var(--c-accent)', textDecoration: 'none' }}>{t('_auth_consent_privacy')}</a>.{' '}
+                {t('_auth_consent_suffix')}
+              </p>
+
               <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--c-muted)' }}>{t('_auth_or')}</div>
               <button onClick={handleGoogle} style={{ padding: '13px 0', background: 'var(--c-bg)', border: '1px solid var(--c-border)', borderRadius: 8, fontSize: 14, cursor: 'pointer', minHeight: 44 }}>
                 {t('_auth_google')}

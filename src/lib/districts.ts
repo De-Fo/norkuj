@@ -46,6 +46,44 @@ export const ALL_DISTRICTS: string[] = Array.from(new Set([
   return a.localeCompare(b)
 })
 
+// ── URL slugs for district landing pages (/bydleni/<slug>) ──
+// Canonical district name → kebab slug. Accented/base variants are mapped to
+// the ASCII form that shows up in search ("Praha 3" → "praha-3", "Žižkov" → "zizkov").
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+}
+const DISTRICT_SLUGS: Record<string, string> = {}
+for (const name of ALL_DISTRICTS) DISTRICT_SLUGS[name] = slugify(name)
+// Explicit overrides for names whose slugify output differs from the search-friendly form
+DISTRICT_SLUGS['Praha 1'] = 'praha-1'
+DISTRICT_SLUGS['Staré Město'] = 'stare-mesto'
+DISTRICT_SLUGS['Malá Strana'] = 'mala-strana'
+DISTRICT_SLUGS['Žižkov'] = 'zizkov'
+DISTRICT_SLUGS['Ďáblice'] = 'dablice'
+DISTRICT_SLUGS['Štěrboholy'] = 'sterboholy'
+DISTRICT_SLUGS['Čakovice'] = 'cakovice'
+DISTRICT_SLUGS['Křeslice'] = 'kreslice'
+DISTRICT_SLUGS['Dolní Měcholupy'] = 'dolni-mecholupy'
+DISTRICT_SLUGS['Velká Chuchle'] = 'velka-chuchle'
+DISTRICT_SLUGS['Nedvězí'] = 'nedvezi'
+DISTRICT_SLUGS['Benice'] = 'benice'
+
+// reverse map: slug → canonical name
+const SLUG_TO_DISTRICT: Record<string, string> = {}
+for (const [name, slug] of Object.entries(DISTRICT_SLUGS)) SLUG_TO_DISTRICT[slug] = name
+
+export function districtForSlug(slug: string): string | null {
+  return SLUG_TO_DISTRICT[slug] ?? null
+}
+export function slugForDistrict(name: string): string | null {
+  return DISTRICT_SLUGS[name] ?? null
+}
+
 // Expand selected districts — if a group is selected, also include all its children.
 // A child (e.g. Vinohrady) can belong to multiple parents, so this stays correct
 // even for shared/split quarters like Vinohrady, Nusle, Žižkov, Vysočany.

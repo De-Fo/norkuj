@@ -6,11 +6,13 @@ import { PROPERTY_TYPE_LABELS } from '../lib/types'
 import { formatPrice, formatDate, getImageUrl } from '../lib/utils'
 import { useLang } from '../lib/lang'
 import { mapError } from '../lib/errors'
+import { ContractModal } from '../components/ContractModal'
 
 interface Props {
   user: User | null
   onBack: () => void
   onEdit: (listing: Listing) => void
+  onRelist?: (listing: Listing) => void   // relist a rented/closed listing (open the prefilled form)
 }
 
 const STATUS_LABELS: Record<ListingStatus, string> = {
@@ -31,11 +33,12 @@ const STATUS_COLORS: Record<ListingStatus, string> = {
   deleted: '#64748b',
 }
 
-export function MyListingsPage({ user, onBack, onEdit }: Props) {
+export function MyListingsPage({ user, onBack, onEdit, onRelist }: Props) {
   const { t } = useLang()
   const [listings, setListings] = useState<Listing[]>([])
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [contractFor, setContractFor] = useState<Listing | null>(null)
 
   const load = async () => {
     if (!user) return
@@ -131,6 +134,16 @@ export function MyListingsPage({ user, onBack, onEdit }: Props) {
                   {t('_mylistings_mark_rented')}
                 </button>
               )}
+              {l.status === 'rented' && onRelist && (
+                <button onClick={() => onRelist(l)} style={{ padding: '8px 14px', fontSize: 12, border: '1px solid var(--c-border)', borderRadius: 7, background: 'var(--c-surface)', color: 'var(--c-text)', cursor: 'pointer', minHeight: 34 }}>
+                  {t('_mylistings_relist')}
+                </button>
+              )}
+              {(l.status === 'draft' || l.status === 'published' || l.status === 'rejected' || l.status === 'rented') && (
+                <button onClick={() => setContractFor(l)} style={{ padding: '8px 14px', fontSize: 12, border: '1px solid var(--c-border)', borderRadius: 7, background: 'var(--c-surface)', color: 'var(--c-text)', cursor: 'pointer', minHeight: 34 }}>
+                  {t('_mylistings_contract')}
+                </button>
+              )}
               <button onClick={() => handleDelete(l.id)} disabled={busyId === l.id} style={{ padding: '8px 14px', fontSize: 12, border: 'none', borderRadius: 7, background: 'color-mix(in srgb, var(--c-red) 15%, transparent)', color: 'var(--c-red)', cursor: 'pointer', minHeight: 34 }}>
                 {t('_mylistings_delete')}
               </button>
@@ -138,6 +151,8 @@ export function MyListingsPage({ user, onBack, onEdit }: Props) {
           </div>
         ))}
       </div>
+
+      {contractFor && <ContractModal listing={contractFor} onClose={() => setContractFor(null)} />}
     </div>
   )
 }

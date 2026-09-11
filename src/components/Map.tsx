@@ -52,6 +52,7 @@ interface Props {
   listings: ListingSearchResult[]
   highlightedId: string | null
   onMarkerClick: (id: string) => void
+  onMarkerHover?: (id: string | null) => void
   onBoundsChange: (bbox: { west: number; south: number; east: number; north: number }) => void
   activeLines: string[]
   activeDistricts: string[]
@@ -61,7 +62,7 @@ interface Props {
   t?: (key: string) => string
 }
 
-export function Map({ listings, highlightedId, onMarkerClick, onBoundsChange, activeLines, activeDistricts, isochronePolygon, isochroneCenter, onIsochroneClick, t: tFn }: Props) {
+export function Map({ listings, highlightedId, onMarkerClick, onMarkerHover, onBoundsChange, activeLines, activeDistricts, isochronePolygon, isochroneCenter, onIsochroneClick, t: tFn }: Props) {
   const t = tFn || ((s: string) => s)
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
@@ -71,6 +72,8 @@ export function Map({ listings, highlightedId, onMarkerClick, onBoundsChange, ac
   onIsochroneClickRef.current = onIsochroneClick
   const onMarkerClickRef = useRef(onMarkerClick)
   onMarkerClickRef.current = onMarkerClick
+  const onMarkerHoverRef = useRef(onMarkerHover)
+  onMarkerHoverRef.current = onMarkerHover
 
   const removeOverlays = useCallback((map: maplibregl.Map) => {
     const ids = activeLayerIds.current
@@ -251,15 +254,24 @@ export function Map({ listings, highlightedId, onMarkerClick, onBoundsChange, ac
       inner.style.cssText = `width:28px;height:28px;border-radius:50%;background:${COLORS[l.transit_status]};border:2.5px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.22);transition:transform 0.13s;`
       el.appendChild(inner)
 
-      el.addEventListener('click', () => onMarkerClickRef.current(l.listing_id))
-      el.addEventListener('mouseenter', () => { inner.style.transform = 'scale(1.2)' })
-      el.addEventListener('mouseleave', () => { inner.style.transform = 'scale(1)' })
-
+      const popup = new maplibregl.Popup({ offset: 16, closeButton: false })
+        .setHTML(`<strong>${l.title}</strong><br>${l.price_total_czk.toLocaleString('cs-CZ')} Kč · ${l.area_sqm} m²`)
       const marker = new maplibregl.Marker({ element: el })
         .setLngLat([l.lng, l.lat])
-        .setPopup(new maplibregl.Popup({ offset: 16, closeButton: false })
-        .setHTML(`<strong>${l.title}</strong><br>${l.price_total_czk.toLocaleString('cs-CZ')} Kč · ${l.area_sqm} m²`))
+        .setPopup(popup)
         .addTo(map)
+
+      el.addEventListener('click', () => onMarkerClickRef.current(l.listing_id))
+      el.addEventListener('mouseenter', () => {
+        inner.style.transform = 'scale(1.2)'
+        popup.addTo(map)              // show info box on hover
+        onMarkerHoverRef.current?.(l.listing_id)   // highlight the card
+      })
+      el.addEventListener('mouseleave', () => {
+        inner.style.transform = 'scale(1)'
+        popup.remove()                // hide info box on leave
+        onMarkerHoverRef.current?.(null)
+      })
       markersRef.current.set(l.listing_id, marker)
     })
   }, [listings])

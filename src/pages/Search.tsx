@@ -24,9 +24,10 @@ interface Props {
   onListingClick: (id: string) => void
   isMobile?: boolean
   isochroneAutoShowMap?: () => void
+  onSaveFilters?: () => void
 }
 
-export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingClick, isMobile, isochroneAutoShowMap }: Props) {
+export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingClick, isMobile, isochroneAutoShowMap, onSaveFilters }: Props) {
   const { t } = useLang()
   const [listings, setListings] = useState<ListingSearchResult[]>([])
   const [loading, setLoading] = useState(false)
@@ -43,9 +44,7 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
   const isoReqRef = useRef(0)
 
   const fetchListings = useCallback(async (f: SearchFilters, b: BBox | null) => {
-    // ═══════════════════════════════════════════════════════════════
-    // 1. Always fetch all published listings as the base
-    // ═══════════════════════════════════════════════════════════════
+    // Base data = all published listings; filtering happens on the client
     const { data: baseData, error } = await (supabase.rpc as any)('get_published_listings_with_coords')
     if (error) { if (import.meta.env.DEV) console.error(error); setListings([]); return }
     let base = (baseData ?? []) as any[]
@@ -59,9 +58,7 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
       return listingDists.some((d: string) => expandedDistricts.includes(d))
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // 2. Fetch transit proximity for each selected line
-    // ═══════════════════════════════════════════════════════════════
+    // Transit proximity for each selected line
     const hasTransit = f.transitLines.length > 0
     const transitInfo = new globalThis.Map<string, {
       nearTransit: boolean; stationName: string; stationLine: string; metres: number
@@ -72,9 +69,9 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
         f.transitLines.map(line =>
           (supabase.rpc as any)('search_listings_with_transit', {
             p_line: line,
-            p_max_price: 0,           // no price filtering in RPC — done client-side
-            p_property_type: null,     // no type filtering in RPC — done client-side
-            p_bbox: null,              // no bbox filtering in RPC — done client-side
+            p_max_price: 0,           // filtering stays client-side
+            p_property_type: null,
+            p_bbox: null,
           }).then((r: any) => {
             if (r.error && import.meta.env.DEV) console.error('[transit search]', r.error)
             return r.data ?? []
@@ -100,16 +97,7 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
       }
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // 3. Merge transit info + compute smart color
-    // When BOTH transitLines AND districts are selected:
-    //   green  = v obou oblastech  → listing je v okrsku A ZÁROVEŇ blízko linky
-    //   yellow = jenom v městské části  → listing je v okrsku, ale daleko od linky
-    //   red    = jenom na trase linek  → listing je blízko linky, ale mimo okrsek
-    //   grey   = ostatní
-    // When only transit is selected: green=near, yellow=walkable, grey=far
-    // When only district is selected: yellow=in district, grey=out
-    // ═══════════════════════════════════════════════════════════════
+    // Merge transit info + compute status (green/yellow/red/grey per filter combos)
     const merged = base.map((l: any): ListingSearchResult => {
       const info = transitInfo.get(l.id)
       const inDist = inExpandedDistrict(l)
@@ -122,10 +110,10 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
 
       let status: TransitStatus
       if (hasTransit && hasDist) {
-        if (inDist && near)           status = 'green'   // v obou oblastech
-        else if (inDist)              status = 'yellow'  // jenom v městské části
-        else if (near)                status = 'red'     // jenom na trase vyznačené linky
-        else                          status = 'grey'    // ostatní
+        if (inDist && near)           status = 'green'   // in district AND near line
+        else if (inDist)              status = 'yellow'  // in district only
+        else if (near)                status = 'red'     // near line only
+        else                          status = 'grey'    // neither
       } else if (hasTransit) {
         status = near   ? 'green' : walkable ? 'yellow' : 'grey'
       } else if (hasDist) {
@@ -144,13 +132,10 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
       }
     })
 
-    // ═══════════════════════════════════════════════════════════════
-    // 4. Hard filters (price, area, type, amenities, bbox, transit+district)
-    // ═══════════════════════════════════════════════════════════════
+    // Hard filters (price, area, type, amenities, bbox, transit+district)
     let filtered = [...merged]
 
-    // District hard filter — when transit+area both active, grey listings
-    // (matching neither filter) are excluded entirely
+    // With transit+district both active, grey (matching neither) is excluded
     if (hasTransit && expandedDistricts.length > 0) {
       filtered = filtered.filter(l => l.transit_status !== 'grey')
     } else if (!hasTransit && expandedDistricts.length > 0) {
@@ -180,9 +165,7 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
       filtered = filtered.filter(l => l.lat != null && l.lng != null && pointInBBox(l.lat, l.lng, b))
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // 5. Sort
-    // ═══════════════════════════════════════════════════════════════
+    // Sort; transit mode ranks by status first, then the chosen field
     const sortField = f.sortBy ?? 'date'
     const sortDir = f.sortDir ?? 'desc'
     const dir = sortDir === 'desc' ? -1 : 1
@@ -192,10 +175,9 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
       filtered.sort((a, b) => {
         const statusDiff = STATUS_RANK[a.transit_status] - STATUS_RANK[b.transit_status]
         if (statusDiff !== 0) return statusDiff
-        // Secondary sort
+        // tie-break by chosen field
         if (sortField === 'price') return (a.price_total_czk - b.price_total_czk) * dir
         if (sortField === 'area') return (a.area_sqm - b.area_sqm) * dir
-        // date — use created_at from raw data, fallback to listing order
         return ((a as any).created_at ?? '').localeCompare((b as any).created_at ?? '') * dir
       })
     } else {
@@ -287,6 +269,8 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
 
   return (
     <div style={{ display: 'flex', flex: 1, overflow: 'hidden', height: '100%' }}>
+      {/* SEO h1 - visually hidden, crawl-visible */}
+      <h1 className="sr-only">{t('_search_h1')}</h1>
 
       {/* ── Map (desktop: side panel, mobile: full-height layer) ── */}
       {(!isMobile || showMap) && (
@@ -306,7 +290,8 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
             listings={listingsFilteredByIso.filter(l => l.lat !== 0)}
             highlightedId={highlightedId}
             onMarkerClick={handleMarkerClick}
-            onBoundsChange={setBbox}
+            onMarkerHover={setHighlightedId}
+            onBoundsChange={(b) => { if (filters.filterByMapArea) setBbox(b) }}
             activeLines={filters.transitLines}
             activeDistricts={filters.districts}
             isochronePolygon={isoPolygon}
@@ -340,12 +325,14 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
 
       <div style={{
         width: isMobile ? '100%' : (showMap ? '50%' : '100%'),
+        maxWidth: (!isMobile && !showMap) ? 960 : undefined,
+        margin: (!isMobile && !showMap) ? '0 auto' : undefined,
         display: 'flex', flexDirection: 'column',
         borderLeft: (!isMobile && showMap) ? '1px solid var(--c-border)' : 'none',
         background: 'var(--c-bg)', overflow: 'hidden', flexShrink: 0,
         zIndex: isMobile && showMap ? 5 : undefined,
       }}>
-        <FilterPanel filters={filters} onChange={onChange} resultCount={listings.length} loading={loading} isMobile={isMobile} />
+        <FilterPanel filters={filters} onChange={onChange} resultCount={listings.length} loading={loading} isMobile={isMobile} onSaveFilters={onSaveFilters} />
 
         {/* ── Toolbar: isochrone + sort + toggle map ── */}
         <div style={{
@@ -414,6 +401,7 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
           <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 3 : 6, marginLeft: 'auto', flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
               <select value={filters.sortBy} onChange={e => onChange({ ...filters, sortBy: e.target.value as any })}
+                aria-label={t('sort_label')}
                 style={{
                   padding: isMobile ? '6px 8px' : '2px 6px', border: '1px solid var(--c-border)', borderRadius: 4,
                   fontSize: isMobile ? 11 : 10, color: 'var(--c-muted)', background: 'var(--c-surface)', outline: 'none',
@@ -424,6 +412,8 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
                 <option value="area">{t('sort_area')}</option>
               </select>
               <button onClick={() => onChange({ ...filters, sortDir: filters.sortDir === 'desc' ? 'asc' : 'desc' })}
+                aria-label={filters.sortDir === 'desc' ? t('sort_desc') : t('sort_asc')}
+                title={filters.sortDir === 'desc' ? t('sort_desc') : t('sort_asc')}
                 style={{
                   padding: isMobile ? '6px 8px' : '2px 6px', border: '1px solid var(--c-border)', borderRadius: 4,
                   background: 'transparent', fontSize: isMobile ? 13 : 11, color: 'var(--c-muted)', cursor: 'pointer',
@@ -517,9 +507,41 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
               })()}
             </div>
           )}
+
+          {/* static SEO intro + FAQ block (crawlable, doubles as GEO content) */}
+          <BeforeFooter />
+
           <Footer />
         </div>
       </div>
+    </div>
+  )
+}
+
+function BeforeFooter() {
+  const { t } = useLang()
+  return (
+    <div style={{ padding: '24px 16px 8px', borderTop: '1px solid var(--c-border)', maxWidth: 900, margin: '0 auto', width: '100%' }}>
+      <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8, color: 'var(--c-text)' }}>{t('_search_h1')}</h2>
+      <p style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--c-text-secondary)', marginBottom: 16 }}>{t('_search_intro')}</p>
+
+      {/* FAQ - the whole block is one collapsible unit */}
+      <details style={{ margin: '16px 0 8px', border: '1px solid var(--c-border)', borderRadius: 8, background: 'var(--c-surface)' }}>
+        <summary style={{
+          padding: '10px 12px', cursor: 'pointer', fontWeight: 600, fontSize: 15,
+          color: 'var(--c-text)', listStyle: 'none',
+        }}>
+          <span style={{ marginRight: 8 }}>▸</span>{t('_search_faq_h')}
+        </summary>
+        <div style={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {[['_search_faq_q1', '_search_faq_a1'], ['_search_faq_q2', '_search_faq_a2'], ['_search_faq_q3', '_search_faq_a3']].map(([q, a]) => (
+            <div key={q}>
+              <p style={{ fontWeight: 600, fontSize: 13, color: 'var(--c-text)', margin: '0 0 2px' }}>{t(q)}</p>
+              <p style={{ fontSize: 13, lineHeight: 1.65, color: 'var(--c-text-secondary)', margin: 0 }}>{t(a)}</p>
+            </div>
+          ))}
+        </div>
+      </details>
     </div>
   )
 }

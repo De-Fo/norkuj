@@ -1,13 +1,14 @@
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import type { SearchFilters, PropertyType } from '../lib/types'
 import { DEFAULT_FILTERS, PROPERTY_TYPE_LABELS, PRAGUE_DISTRICTS } from '../lib/types'
 import { lineColor, activeFilterCount } from '../lib/utils'
 import { useLang } from '../lib/lang'
 
 const METRO_LINES = ['A', 'B', 'C']
-const TRAM_LINES = ['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','17','18','20','22','23','24','25','26']
+const TRAM_LINES = ['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22','23','24','25','26']
 const AREA_OPTS = [15, 25, 35, 50, 70, 100]
-const TYPE_ORDER: PropertyType[] = ['pokoj','1+kk','1+1','2+kk','2+1','3+kk','3+1','4+kk','4+1','atypical']
+const TYPE_ORDER: PropertyType[] = ['pokoj','sdileny_pokoj','1+kk','1+1','2+kk','2+1','3+kk','3+1','4+kk','4+1','5+kk','5+1','6+kk','6+1','atypical']
 
 interface Props {
   filters: SearchFilters
@@ -15,6 +16,10 @@ interface Props {
   resultCount: number
   loading: boolean
   isMobile?: boolean
+  onSaveFilters?: () => void
+  requiredMaxPrice?: boolean   // watch-cat composer: price cap is mandatory (search stays optional)
+  requiresMin?: boolean        // watch-cat composer: a high maxPrice needs a minPrice
+  minPrice?: number            // current minPrice — used to decide when to show the requiresMin hint
 }
 
 function toggle<T>(arr: T[], val: T): T[] {
@@ -40,7 +45,7 @@ function Chip({ active, onClick, children, color, isMobile }: {
   )
 }
 
-function Section({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function Section({ label, hint, children }: { label: ReactNode; hint?: string; children: ReactNode }) {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 6 }}>
@@ -54,8 +59,8 @@ function Section({ label, hint, children }: { label: string; hint?: string; chil
   )
 }
 
-export function FilterPanel({ filters, onChange, resultCount, loading, isMobile }: Props) {
-  const [expanded, setExpanded] = useState(false)
+export function FilterPanel({ filters, onChange, resultCount, loading, isMobile, onSaveFilters, requiredMaxPrice, requiresMin, minPrice }: Props) {
+  const [expanded, setExpanded] = useState(true)
   const set = (p: Partial<SearchFilters>) => onChange({ ...filters, ...p })
   const activeCount = activeFilterCount(filters)
 
@@ -86,9 +91,11 @@ export function FilterPanel({ filters, onChange, resultCount, loading, isMobile 
           {loading ? t('loading') : `${resultCount} ${t('listings_count')}`}
         </span>
         <span style={{
-          fontSize: 11, color: 'var(--c-accent, #2563eb)', fontWeight: 500,
-          padding: '3px 8px', borderRadius: 6,
-          background: expanded ? 'rgba(37,99,235,0.08)' : 'transparent',
+          fontSize: 13, color: 'var(--c-accent, #2563eb)', fontWeight: 600, whiteSpace: 'nowrap',
+          padding: '7px 14px', borderRadius: 8,
+          background: expanded ? 'rgba(37,99,235,0.12)' : 'rgba(37,99,235,0.06)',
+          border: '1px solid rgba(37,99,235,0.28)',
+          boxShadow: expanded ? 'none' : '0 1px 2px rgba(0,0,0,0.06)',
         }}>
           {expanded ? '▲ ' + t('hide_label') : '▼ ' + t('filters_label')}{activeCount > 0 ? ` (${activeCount})` : ''}
         </span>
@@ -105,23 +112,36 @@ export function FilterPanel({ filters, onChange, resultCount, loading, isMobile 
         }}>
           <div style={{ padding: expanded ? '0 12px 14px' : '0 12px', display: 'flex', flexDirection: 'column', gap: 14, maxHeight: isMobile ? '50vh' : '35vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
 
-          {/* Toggle switch for map-area filtering — always visible at top */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0' }}>
-            <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--c-text)' }}>
-              {t('map_filter_label')}
-            </span>
-            <div onClick={() => set({ filterByMapArea: !filters.filterByMapArea })}
-              style={{
-                width: 38, height: 22, borderRadius: 11, cursor: 'pointer',
-                background: filters.filterByMapArea ? 'var(--c-accent, #2563eb)' : 'var(--c-border-md)',
-                position: 'relative', transition: 'background 0.2s', flexShrink: 0,
-              }}>
-              <div style={{
-                width: 16, height: 16, borderRadius: '50%', background: 'var(--c-surface)',
-                position: 'absolute', top: 3, left: filters.filterByMapArea ? 19 : 3,
-                transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-              }} />
+          {/* Toggle switch for map-area filtering, inline with its label. On mobile
+              the save-filters button drops below it so it can't crowd the slider. */}
+          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 8 : 0, padding: '8px 10px', borderRadius: 9 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-text)', whiteSpace: 'nowrap' }}>
+                {t('map_filter_label')}
+              </span>
+              <div role="switch" aria-checked={filters.filterByMapArea} aria-label={t('map_filter_label')}
+                onClick={() => set({ filterByMapArea: !filters.filterByMapArea })}
+                style={{
+                  width: 38, height: 22, borderRadius: 11, cursor: 'pointer',
+                  background: filters.filterByMapArea ? 'var(--c-accent, #2563eb)' : 'var(--c-border-md)',
+                  position: 'relative', transition: 'background 0.2s', flexShrink: 0,
+                }}>
+                <div style={{
+                  width: 16, height: 16, borderRadius: '50%', background: '#fff',
+                  position: 'absolute', top: 3, left: filters.filterByMapArea ? 19 : 3,
+                  transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                }} />
+              </div>
             </div>
+            {onSaveFilters && (
+              <button onClick={onSaveFilters} style={{
+                marginLeft: isMobile ? 0 : 'auto', padding: '6px 12px', border: 'none', borderRadius: 8, cursor: 'pointer',
+                background: 'var(--c-accent, #2563eb)', color: '#fff', fontSize: 12, fontWeight: 500,
+                display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap', flexShrink: 0, alignSelf: 'flex-start',
+              }}>
+                🐱 {t('watchcats_save_filters')}
+              </button>
+            )}
           </div>
           <div style={{ height: 1, background: 'var(--c-border)' }} />
 
@@ -145,6 +165,10 @@ export function FilterPanel({ filters, onChange, resultCount, loading, isMobile 
           </Section>
 
           <Section label={t('district_label')} hint={t('multi_hint')}>
+            <Chip active={filters.districts.length === 0} color="var(--c-accent)"
+              onClick={() => set({ districts: [] })} isMobile={isMobile}>
+              Praha (celá)
+            </Chip>
             {PRAGUE_DISTRICTS.map(d => (
               <Chip key={d} active={filters.districts.includes(d)}
                 onClick={() => set({ districts: toggle(filters.districts, d) })} isMobile={isMobile}>
@@ -162,7 +186,7 @@ export function FilterPanel({ filters, onChange, resultCount, loading, isMobile 
             ))}
           </Section>
 
-          <Section label={t('_rent')} hint={t('price_hint')}>
+          <Section label={requiredMaxPrice ? <>{t('_rent')} <span style={{ color: 'var(--c-red, #dc2626)' }}>*</span></> : t('_rent')} hint={t('price_hint')}>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
               <input type="number" min={0} max={999999} placeholder={lang === 'en' ? 'from' : 'od'} value={filters.minPrice || ''}
                 onChange={e => set({ minPrice: parseInt(e.target.value) || 0 })}
@@ -172,6 +196,9 @@ export function FilterPanel({ filters, onChange, resultCount, loading, isMobile 
                 onChange={e => set({ maxPrice: parseInt(e.target.value) || 0 })}
                 style={{ width: 72, padding: '4px 7px', border: '1px solid var(--c-border)', borderRadius: 6, fontSize: 12, outline: 'none', color: 'var(--c-text)', background: 'var(--c-surface)' }} />
             </div>
+            {requiresMin && (minPrice ?? 0) === 0 && (
+              <div style={{ marginTop: 6, fontSize: 11, color: 'var(--c-red, #dc2626)' }}>{t('watchcats_min_price_required')}</div>
+            )}
           </Section>
 
           <Section label={t('min_area_label')} hint="m²">
@@ -189,15 +216,17 @@ export function FilterPanel({ filters, onChange, resultCount, loading, isMobile 
             <Chip active={filters.balcony} onClick={() => set({ balcony: !filters.balcony })} isMobile={isMobile}>{t('amenities_balcony')}</Chip>
           </Section>
 
-          {activeCount > 0 && (
-            <button onClick={() => onChange(DEFAULT_FILTERS)} style={{
-              alignSelf: 'flex-start', padding: '4px 10px', background: 'transparent',
-              border: '1px solid var(--c-border)', borderRadius: 6, fontSize: 11,
-              color: 'var(--c-muted)', cursor: 'pointer',
-            }}>
-              {t('reset_label')}
-            </button>
-          )}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+            {activeCount > 0 && (
+              <button onClick={() => onChange(DEFAULT_FILTERS)} style={{
+                padding: '4px 10px', background: 'transparent',
+                border: '1px solid var(--c-border)', borderRadius: 6, fontSize: 11,
+                color: 'var(--c-muted)', cursor: 'pointer',
+              }}>
+                {t('reset_label')}
+              </button>
+            )}
+          </div>
         </div>
       </div>
       </div>

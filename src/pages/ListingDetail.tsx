@@ -82,6 +82,7 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
         .from('listings') as any)
         .select('*')
         .eq('id', listingId)
+        .eq('status', 'published')   // deleted/rented never open via URL, for anyone (incl. admin RLS bypass)
         .maybeSingle()
 
       if (error) {

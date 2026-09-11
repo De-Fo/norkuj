@@ -8,12 +8,18 @@ const CFG: Record<TransitStatus, { bar: string; badge: string; text: string; dot
   red:    { bar: '#dc2626', badge: '#fee2e2', text: '#b91c1c', dot: '#dc2626' },
   grey:   { bar: '#9ca3af', badge: '#f1f5f9', text: '#64748b', dot: '#9ca3af' },
 }
+const FALLBACK_BAR = '#9ca3af'
 
 export function ListingCard({ listing, highlighted, onClick }: {
   listing: ListingSearchResult; highlighted?: boolean; onClick?: () => void
 }) {
-  const c = CFG[listing.transit_status]
+  // Watch-cat previews feed compact rows without transit geometry (no
+  // transit_status / nearest_station_*). Fall back so the card never crashes.
+  const status: TransitStatus = listing.transit_status in CFG ? listing.transit_status : 'grey'
+  const c = CFG[status]
+  const bar = c?.bar ?? FALLBACK_BAR
   const thumb = listing.image_paths?.[0] ? getImageUrl(listing.image_paths[0]) : null
+  const station = listing.nearest_station_name && listing.nearest_station_name !== '—' ? listing.nearest_station_name : null
 
   return (
     <div onClick={onClick} style={{
@@ -25,7 +31,7 @@ export function ListingCard({ listing, highlighted, onClick }: {
       boxShadow: highlighted ? '0 0 0 3px rgba(37,99,235,0.1)' : '0 1px 3px rgba(0,0,0,0.06)',
       transition: 'box-shadow 0.13s',
     }}>
-      <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: c.bar, borderRadius: '10px 0 0 10px' }} />
+      <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: bar, borderRadius: '10px 0 0 10px' }} />
 
       <div style={{
         width: 64, height: 56, borderRadius: 7, background: 'var(--c-bg)',
@@ -48,10 +54,10 @@ export function ListingCard({ listing, highlighted, onClick }: {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
           <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--c-text)' }}>{formatPrice(listing.price_total_czk)}</span>
-          {listing.nearest_station_name !== '—' && (
+          {station && (
             <span style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, padding: '2px 7px', borderRadius: 9, background: c.badge, color: c.text }}>
               <span style={{ width: 5, height: 5, borderRadius: '50%', background: c.dot }} />
-              {listing.nearest_station_name} · {listing.nearest_station_metres} m
+              {station}{listing.nearest_station_metres ? ` · ${listing.nearest_station_metres} m` : ''}
             </span>
           )}
         </div>
