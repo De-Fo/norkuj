@@ -105,7 +105,7 @@ export function ProfilePage({ user, onBack }: Props) {
 
   return (
     <div style={{ maxWidth: 480, margin: window.innerWidth < 768 ? '24px auto' : '40px auto', padding: window.innerWidth < 768 ? 16 : 24 }}>
-      <button onClick={onBack} style={{ marginBottom: 16, padding: '10px 16px', border: '1px solid var(--c-border)', borderRadius: 8, background: 'var(--c-surface)', cursor: 'pointer', fontSize: 13, color: 'var(--c-text)', minHeight: 40 }}>
+      <button onClick={onBack} style={{ marginBottom: 16, padding: '10px 16px', border: '1px solid var(--c-border)', borderRadius: 3, background: 'var(--c-surface)', cursor: 'pointer', fontSize: 13, color: 'var(--c-text)', minHeight: 40 }}>
         {t('_profile_back')}
       </button>
 
@@ -115,20 +115,20 @@ export function ProfilePage({ user, onBack }: Props) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <label style={{ fontSize: 12, color: 'var(--c-muted)' }}>{t('_profile_email')}</label>
           <input value={profile?.email ?? user.email ?? ''} disabled
-            style={{ padding: '12px', border: '1px solid var(--c-border)', borderRadius: 8, background: 'var(--c-bg)', color: 'var(--c-muted)', fontSize: 14 }} />
+            style={{ padding: '12px', border: '1px solid var(--c-border)', borderRadius: 3, background: 'var(--c-bg)', color: 'var(--c-muted)', fontSize: 14 }} />
 
           <label style={{ fontSize: 12, color: 'var(--c-muted)' }}>{t('_profile_name')}</label>
           <input value={displayName} onChange={e => setDisplayName(e.target.value)}
-            style={{ padding: '12px', border: '1px solid var(--c-border)', borderRadius: 8, background: 'var(--c-surface)', color: 'var(--c-text)', fontSize: 14, outline: 'none' }} />
+            style={{ padding: '12px', border: '1px solid var(--c-border)', borderRadius: 3, background: 'var(--c-surface)', color: 'var(--c-text)', fontSize: 14, outline: 'none' }} />
 
           <label style={{ fontSize: 12, color: 'var(--c-muted)' }}>{t('_profile_phone')}</label>
           <input value={phone} onChange={e => setPhone(e.target.value)} type="tel"
-            style={{ padding: '12px', border: '1px solid var(--c-border)', borderRadius: 8, background: 'var(--c-surface)', color: 'var(--c-text)', fontSize: 14, outline: 'none' }} />
+            style={{ padding: '12px', border: '1px solid var(--c-border)', borderRadius: 3, background: 'var(--c-surface)', color: 'var(--c-text)', fontSize: 14, outline: 'none' }} />
 
           {msg && <div style={{ fontSize: 12, color: msg.ok ? 'var(--c-green)' : 'var(--c-red)' }}>{msg.text}</div>}
 
           <button onClick={handleSave} disabled={saving}
-            style={{ padding: '13px 0', background: 'var(--c-accent)', color: 'white', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer', fontSize: 14, minHeight: 44 }}>
+            style={{ padding: '13px 0', background: 'var(--c-action)', boxShadow: '0 2px 0 var(--c-action-step)', color: 'white', border: 'none', borderRadius: 3, fontWeight: 600, cursor: 'pointer', fontSize: 14, minHeight: 44 }}>
             {saving ? t('_profile_saving') : t('_profile_save')}
           </button>
 
@@ -136,7 +136,7 @@ export function ProfilePage({ user, onBack }: Props) {
           {!isOAuthOnly && (
             <>
               <button onClick={() => setPwOpen(true)}
-                style={{ width: '100%', padding: '13px 0', border: '1px solid var(--c-border)', borderRadius: 8,
+                style={{ width: '100%', padding: '13px 0', border: '1px solid var(--c-border)', borderRadius: 3,
                   background: 'var(--c-surface)', color: 'var(--c-text)', fontSize: 14, cursor: 'pointer', minHeight: 44 }}>
                 {t('_profile_password_section')}
               </button>
@@ -150,11 +150,11 @@ export function ProfilePage({ user, onBack }: Props) {
                     zIndex: 80, padding: 16,
                   }}>
                   <div style={{
-                    background: 'var(--c-surface)', borderRadius: window.innerWidth < 768 ? 0 : 16,
+                    background: 'var(--c-surface)', borderRadius: window.innerWidth < 768 ? 0 : 6,
                     maxWidth: 400, width: '100%',
                     maxHeight: window.innerWidth < 768 ? '100dvh' : undefined,
                     height: window.innerWidth < 768 ? '100dvh' : undefined,
-                    boxShadow: window.innerWidth < 768 ? 'none' : '0 24px 64px rgba(0,0,0,0.35)',
+                    boxShadow: window.innerWidth < 768 ? 'none' : '6px 6px 0 var(--c-text)',
                     position: 'relative', overflow: 'hidden',
                   }}>
                     <div style={{
@@ -178,17 +178,17 @@ export function ProfilePage({ user, onBack }: Props) {
                       <input type="password" placeholder={t('_profile_password_current')} value={pwCurrent}
                         onChange={e => setPwCurrent(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && handleChangePassword()}
-                        style={{ padding: '12px', border: '1px solid var(--c-border)', borderRadius: 8,
+                        style={{ padding: '12px', border: '1px solid var(--c-border)', borderRadius: 3,
                           background: 'var(--c-surface)', color: 'var(--c-text)', outline: 'none', fontSize: 14 }} />
                       <input type="password" placeholder={t('_profile_password_new')} value={pwNew}
                         onChange={e => setPwNew(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && handleChangePassword()}
-                        style={{ padding: '12px', border: '1px solid var(--c-border)', borderRadius: 8,
+                        style={{ padding: '12px', border: '1px solid var(--c-border)', borderRadius: 3,
                           background: 'var(--c-surface)', color: 'var(--c-text)', outline: 'none', fontSize: 14 }} />
                       <input type="password" placeholder={t('_profile_password_confirm')} value={pwConfirm}
                         onChange={e => setPwConfirm(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && handleChangePassword()}
-                        style={{ padding: '12px', border: '1px solid var(--c-border)', borderRadius: 8,
+                        style={{ padding: '12px', border: '1px solid var(--c-border)', borderRadius: 3,
                           background: 'var(--c-surface)', color: 'var(--c-text)', outline: 'none', fontSize: 14 }} />
                       {pwMsg && (
                         <div style={{ fontSize: 12, color: pwMsg === t('_profile_password_changed') ? 'var(--c-green)' : 'var(--c-red)' }}>
@@ -196,8 +196,8 @@ export function ProfilePage({ user, onBack }: Props) {
                         </div>
                       )}
                       <button onClick={handleChangePassword} disabled={pwSaving || !pwCurrent || !pwNew || !pwConfirm}
-                        style={{ padding: '13px 0', background: pwSaving ? 'color-mix(in srgb, var(--c-accent) 60%, transparent)' : 'var(--c-accent)',
-                          color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer', minHeight: 44,
+                        style={{ padding: '13px 0', background: pwSaving ? 'color-mix(in srgb, var(--c-action) 60%, transparent)' : 'var(--c-action)',
+                          color: 'white', border: 'none', borderRadius: 3, fontSize: 14, fontWeight: 600, cursor: 'pointer', minHeight: 44,
                           opacity: !pwCurrent || !pwNew || !pwConfirm ? 0.5 : 1 }}>
                         {pwSaving ? '...' : t('_profile_password_submit')}
                       </button>
@@ -223,12 +223,12 @@ export function ProfilePage({ user, onBack }: Props) {
                 </p>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={() => setShowDeleteConfirm(false)} disabled={deleting}
-                    style={{ flex: 1, padding: '11px 0', border: '1px solid var(--c-border)', borderRadius: 8,
+                    style={{ flex: 1, padding: '11px 0', border: '1px solid var(--c-border)', borderRadius: 3,
                       background: 'var(--c-surface)', color: 'var(--c-text)', fontSize: 13, cursor: 'pointer' }}>
                     {t('_profile_delete_cancel')}
                   </button>
                   <button onClick={handleDeleteProfile} disabled={deleting}
-                    style={{ flex: 1, padding: '11px 0', border: 'none', borderRadius: 8,
+                    style={{ flex: 1, padding: '11px 0', border: 'none', borderRadius: 3,
                       background: 'var(--c-red)', color: 'white', fontSize: 13, fontWeight: 600, cursor: deleting ? 'not-allowed' : 'pointer' }}>
                     {deleting ? t('_profile_delete_progress') : t('_profile_delete_confirm')}
                   </button>
@@ -236,7 +236,7 @@ export function ProfilePage({ user, onBack }: Props) {
               </div>
             ) : (
               <button onClick={() => setShowDeleteConfirm(true)}
-                style={{ width: '100%', padding: '13px 0', border: '1px solid color-mix(in srgb, var(--c-red) 40%, transparent)', borderRadius: 8,
+                style={{ width: '100%', padding: '13px 0', border: '1px solid color-mix(in srgb, var(--c-red) 40%, transparent)', borderRadius: 3,
                   background: 'transparent', color: 'var(--c-red)', fontSize: 14, fontWeight: 500, cursor: 'pointer', minHeight: 44 }}>
                 🗑 {t('_profile_delete_title')}
               </button>

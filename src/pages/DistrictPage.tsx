@@ -83,7 +83,7 @@ export function DistrictPage({ district, onGoHome, onListingClick }: Props) {
               return (
                 <Fragment key={p}>
                   {i > 0 && ', '}
-                  <a href={'/bydleni/' + slug}
+                  <a href={'/bydleni/' + slug + '/'}
                     style={{ color: 'var(--c-accent)', textDecoration: 'none' }}>{p}</a>
                 </Fragment>
               )
@@ -98,9 +98,9 @@ export function DistrictPage({ district, onGoHome, onListingClick }: Props) {
               const slug = slugForDistrict(n)
               if (!slug) return null
               return (
-                <a key={n} href={'/bydleni/' + slug}
+                <a key={n} href={'/bydleni/' + slug + '/'}
                   style={{
-                    padding: '6px 12px', borderRadius: 8, fontSize: 12,
+                    padding: '6px 12px', borderRadius: 3, fontSize: 12,
                     background: 'var(--c-surface)', border: '1px solid var(--c-border)',
                     color: 'var(--c-accent)', textDecoration: 'none',
                   }}>
@@ -132,8 +132,8 @@ export function DistrictPage({ district, onGoHome, onListingClick }: Props) {
         {/* CTA */}
         <button onClick={onGoHome} style={{
           display: 'block', width: '100%', maxWidth: 320, margin: '32px auto 0',
-          padding: '14px 24px', border: 'none', borderRadius: 10,
-          background: 'var(--c-accent)', color: 'white',
+          padding: '14px 24px', border: 'none', borderRadius: 4,
+          background: 'var(--c-action)', color: 'white',
           fontSize: 15, fontWeight: 600, cursor: 'pointer',
         }}>
           Prohledat všechny inzeráty

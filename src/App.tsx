@@ -1,4 +1,7 @@
 import { useEffect, useLayoutEffect, useState, useRef, useCallback, lazy, Suspense } from 'react'
+import { Bell, Moon, Sun, CircleHelp } from 'lucide-react'
+import { ConsentGate } from './components/ConsentGate'
+import { hasCurrentConsent, hasPendingConsent, readPendingConsent, OPENED_FROM_RECOVERY_LINK } from './lib/consent'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
 import { SearchPage } from './pages/Search'
@@ -9,7 +12,6 @@ import { DEFAULT_FILTERS } from './lib/types'
 import type { Listing } from './lib/types'
 import { useLang } from './lib/lang'
 import { registerPushWorker } from './lib/push'
-import { CookieConsent } from './components/CookieConsent'
 import { FeatureTour, isFirstVisit, markTourSeen } from './components/FeatureTour'
 import { usePageMeta } from './lib/seo'
 import { getImageUrl } from './lib/utils'
@@ -23,12 +25,12 @@ const ListingDetail = lazy(() => import('./pages/ListingDetail').then(m => ({ de
 const AdminPanel = lazy(() => import('./pages/AdminPanel').then(m => ({ default: m.AdminPanel })))
 const CompareBezrealitkyPage = lazy(() => import('./pages/CompareBezrealitky').then(m => ({ default: m.CompareBezrealitkyPage })))
 const CompareUlovdomovPage = lazy(() => import('./pages/CompareUlovdomov').then(m => ({ default: m.CompareUlovdomovPage })))
-const WatchCatPage = lazy(() => import('./pages/WatchCatPage').then(m => ({ default: m.WatchCatPage })))
+const NotificationsPage = lazy(() => import('./pages/NotificationsPage').then(m => ({ default: m.NotificationsPage })))
 const ProfilePage = lazy(() => import('./pages/Profile').then(m => ({ default: m.ProfilePage })))
 const MyListingsPage = lazy(() => import('./pages/MyListings').then(m => ({ default: m.MyListingsPage })))
 
 type Theme = 'light' | 'dark'
-type Route = 'search' | 'auth' | 'profile' | 'my-listings' | 'favorites' | 'watchcats' | 'compare-bezrealitky' | 'compare-ulovdomov' | 'district'
+type Route = 'search' | 'auth' | 'profile' | 'my-listings' | 'favorites' | 'notifications' | 'compare-bezrealitky' | 'compare-ulovdomov' | 'district'
 
 function getInitialTheme(): Theme {
   const stored = localStorage.getItem('norkuj-theme')
@@ -43,12 +45,13 @@ export default function App() {
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
   const parseListingIdFromPath = (): string | null => {
-    const m = window.location.pathname.match(/^\/listing\/([^/]+)$/i)
+    const m = window.location.pathname.match(/^\/listing\/([^/]+)\/?$/i)
     return m && UUID_RE.test(m[1]) ? m[1] : null
   }
 
   const parseComparePath = (): Route | null => {
-    const path = window.location.pathname
+    // host serves these with a trailing slash (/compare/x/), so accept both forms
+    const path = window.location.pathname.replace(/\/+$/, '')
     if (path === '/compare/bezrealitky-alternativa') return 'compare-bezrealitky'
     if (path === '/compare/ulovdomov-alternativa') return 'compare-ulovdomov'
     return null
@@ -65,6 +68,7 @@ export default function App() {
   const [districtSlug, setDistrictSlug] = useState<string | null>(() => parseDistrictSlug())
   const goHome = () => { setRoute('search'); setDistrictSlug(null); window.history.replaceState(null, '', '/') }
   const [authLoading, setAuthLoading] = useState(true)
+  const consentWriteInFlight = useRef(false)
   const [filters, setFilters] = useState<SearchFilters>(DEFAULT_FILTERS)
   const [showMap, setShowMap] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
@@ -77,7 +81,7 @@ export default function App() {
   const [favoritesIds, setFavoritesIds] = useState<Set<string>>(new Set())
   const [tourOpen, setTourOpen] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
-  const [watchcatsOpenComposer, setWatchcatsOpenComposer] = useState(false)
+  const [notificationsOpenComposer, setNotificationsOpenComposer] = useState(false)
   const { t, lang, setLang } = useLang()
 
   // #root is hidden in the prerendered HTML (SEO text) until the SPA commits.
@@ -158,7 +162,29 @@ export default function App() {
     })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
       setUser(session?.user ?? null)
-      if (session) setRoute('search')
+      // Google sign-ups: persist the consent captured before the OAuth redirect.
+      const consent = session?.user && !hasCurrentConsent(session.user.user_metadata) ? readPendingConsent() : null
+      if (session?.user && consent && !consentWriteInFlight.current) {
+        consentWriteInFlight.current = true
+        const uid = session.user.id
+        // defer: calling auth methods inside the onAuthStateChange callback can deadlock the auth client
+        setTimeout(() => {
+          supabase.auth.updateUser({ data: consent }).then(({ error }) => {
+            // clear either way: on failure the ConsentGate takes over instead of being bypassed forever
+            try { localStorage.removeItem('norkuj-pending-consent') } catch { /* storage unavailable */ }
+            consentWriteInFlight.current = false
+            if (error) { setUser(u => (u ? { ...u } : u)); return }
+            // mirror into profiles when the row exists (Google users get one via the signup trigger)
+            ;(supabase.from('profiles') as any).update(consent).eq('id', uid).then(({ error: pErr }: any) => {
+              if (pErr && import.meta.env.DEV) console.error('[consent profile mirror]', pErr)
+            })
+          })
+        }, 0)
+      }
+      // Only leave the auth screen after login. Previously every auth event
+      // (session restore, token refresh) forced 'search', which bounced
+      // logged-in visitors off /bydleni/<slug>/ and the compare pages.
+      if (session) setRoute(r => (r === 'auth' ? 'search' : r))
     })
     return () => subscription.unsubscribe()
   }, [])
@@ -217,6 +243,10 @@ export default function App() {
     </div>
   )
 
+  // One-time terms screen: signed-in but no consent on record for the current terms version.
+  // (A just-ticked Google register-tab consent is still being written -> don't flash the gate.)
+  if (user && !hasCurrentConsent(user.user_metadata) && !hasPendingConsent() && !OPENED_FROM_RECOVERY_LINK) return <ConsentGate user={user} />
+
   // ── Route pages ──
   const routeFallback = (
     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--c-faint)', fontSize: 13 }}>
@@ -245,25 +275,25 @@ export default function App() {
     )
   }
 
-  if (route === 'watchcats') {
+  if (route === 'notifications') {
     if (!user) {
       return (
         <div style={{ flex: 1, overflow: 'auto', padding: 32, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, textAlign: 'center' }}>
-          <div style={{ fontSize: 40 }}>🐱</div>
-          <h2 style={{ fontSize: 18, margin: 0, color: 'var(--c-text)' }}>{t('watchcats_title')}</h2>
-          <p style={{ color: 'var(--c-muted)', fontSize: 14, maxWidth: 320, margin: 0 }}>{t('watchcats_login_hint')}</p>
-          <button onClick={() => setRoute('auth')} style={{ padding: '10px 22px', borderRadius: 9, border: 'none', background: 'var(--c-accent, #2563eb)', color: '#fff', fontSize: 14, cursor: 'pointer' }}>
+          <Bell size={36} color="var(--c-muted)" strokeWidth={1.75} />
+          <h2 style={{ fontSize: 18, margin: 0, color: 'var(--c-text)' }}>{t('notifications_title')}</h2>
+          <p style={{ color: 'var(--c-muted)', fontSize: 14, maxWidth: 320, margin: 0 }}>{t('notifications_login_hint')}</p>
+          <button onClick={() => setRoute('auth')} style={{ padding: '10px 22px', borderRadius: 4, border: 'none', background: 'var(--c-action)', boxShadow: '0 2px 0 var(--c-action-step)', color: '#fff', fontSize: 14, cursor: 'pointer' }}>
             {t('login')}
           </button>
         </div>
       )
     }
     return (
-      <Suspense fallback={routeFallback}><WatchCatPage
+      <Suspense fallback={routeFallback}><NotificationsPage
         user={user}
         currentFilters={filters}
-        openComposer={watchcatsOpenComposer}
-        onComposerConsumed={() => setWatchcatsOpenComposer(false)}
+        openComposer={notificationsOpenComposer}
+        onComposerConsumed={() => setNotificationsOpenComposer(false)}
         onGoHome={goHome}
         onApply={(f) => { setFilters(f); setRoute('search') }}
         onListingClick={(id) => { setSelectedListingId(id); setRoute('search') }}
@@ -281,7 +311,13 @@ export default function App() {
     return <Suspense fallback={routeFallback}><DistrictPage
       district={districtSlug}
       onGoHome={goHome}
-      onListingClick={(id) => { setSelectedListingId(id); setRoute('search') }}
+      onListingClick={(id) => {
+        // Listing modal only exists in the search view: leave the district URL
+        // cleanly first so URL, route and canonical stay coherent (back -> '/').
+        setRoute('search'); setDistrictSlug(null)
+        window.history.replaceState(null, '', '/')
+        openListing(id)
+      }}
     /></Suspense>
   }
 
@@ -289,8 +325,8 @@ export default function App() {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', overflow: 'hidden' }}>
       {/* ═══ HEADER ═══ */}
       <header style={{
-        height: 48, flexShrink: 0, background: 'var(--c-surface)',
-        borderBottom: '1px solid var(--c-border)',
+        height: 52, flexShrink: 0, background: 'var(--c-surface)',
+        borderBottom: '2px solid var(--c-text)',
         display: 'flex', alignItems: 'center', padding: `0 ${isMobile ? 8 : 16}px`, justifyContent: 'space-between',
         transition: 'background 0.2s',
         gap: isMobile ? 4 : 0,
@@ -303,25 +339,25 @@ export default function App() {
         <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 3 : 5 }}>
           <div style={{ position: 'relative', display: 'inline-block' }}>
             <button
-              onClick={() => { if (user) setRoute('watchcats'); else setRoute('auth') }}
-              aria-label={t('watchcats_title')}
-              className="wc-btn"
-              title={t('watchcats_title')}
+              onClick={() => { if (user) setRoute('notifications'); else setRoute('auth') }}
+              aria-label={t('notifications_title')}
+              className="notif-btn"
+              title={t('notifications_title')}
               style={{
-                height: 32, padding: isMobile ? 0 : '0 10px', background: 'transparent',
-                border: '1px solid var(--c-border)', borderRadius: 7, cursor: 'pointer',
+                height: 32, padding: isMobile ? 0 : '0 10px',
+                borderRadius: 3,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                 color: 'var(--c-muted)', fontSize: 14, flexShrink: 0,
               }}>
-              🐱
-              {!isMobile && <span style={{ fontSize: 12, whiteSpace: 'nowrap', color: 'var(--c-text)' }}>{t('watchcats_header')}</span>}
+              <Bell size={15} strokeWidth={2} />
+              {!isMobile && <span style={{ fontSize: 12, whiteSpace: 'nowrap', color: 'var(--c-text)' }}>{t('notifications_header')}</span>}
             </button>
           </div>
           {user && (
             <button onClick={() => setRoute('favorites')} title={t('favorites_title')} aria-label={t('favorites_title')}
               style={{
-                width: 32, height: 32, padding: 0, background: 'transparent',
-                border: '1px solid var(--c-border)', borderRadius: 7, cursor: 'pointer',
+                width: 32, height: 32, padding: 0,
+                borderRadius: 3,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 color: favoritesIds.size > 0 ? '#eab308' : 'var(--c-muted)',
                 fontSize: 14, flexShrink: 0,
@@ -335,19 +371,16 @@ export default function App() {
             <>
               {/* Visible mobile actions */}
               {user && (
-                <button onClick={() => setShowCreate(true)} title={t('add_listing')} aria-label={t('add_listing')}
+                <button className="btn-action" onClick={() => setShowCreate(true)} title={t('add_listing')} aria-label={t('add_listing')}
                   style={{
-                    width: 32, height: 32, padding: 0, border: 'none', borderRadius: 7,
-                    background: 'green', color: 'white', fontSize: 16, cursor: 'pointer', flexShrink: 0,
+                    width: 32, height: 32, padding: 0, borderRadius: 3,
+                    fontSize: 16,  flexShrink: 0,
                   }}>
                   ＋
                 </button>
               )}
               {!user && (
-                <button onClick={() => setRoute('auth')} style={{
-                  height: 32, padding: '0 10px', border: 'none', borderRadius: 7,
-                  background: 'darkblue', color: 'white', fontSize: 12, fontWeight: 500, cursor: 'pointer',
-                }}>
+                <button className="btn-hard btn-hard-red" onClick={() => setRoute('auth')} style={{ padding: '0 10px', marginRight: 3 }}>
                   {t('register')}
                 </button>
               )}
@@ -356,8 +389,8 @@ export default function App() {
               <button onClick={() => setLang(lang === 'cz' ? 'en' : 'cz')}
                 aria-label={lang === 'cz' ? 'Přepnout jazyk' : 'Switch language'}
                 style={{
-                  width: 32, height: 32, padding: 0, background: 'transparent',
-                  border: '1px solid var(--c-border)', borderRadius: 7, cursor: 'pointer', flexShrink: 0,
+                  width: 32, height: 32, padding: 0,
+                  borderRadius: 3, flexShrink: 0,
                   fontSize: 14, lineHeight: 1,
                 }}>
                 {lang === 'cz' ? '🇨🇿' : '🇬🇧'}
@@ -391,18 +424,18 @@ export default function App() {
               <button onClick={toggleTheme}
                 title={t('theme_dark')} aria-label={t('theme_dark')}
                 style={{
-                  minWidth: 32, height: 32, padding: 0, background: 'transparent',
-                  border: '1px solid var(--c-border)', borderRadius: 7, cursor: 'pointer',
+                  minWidth: 32, height: 32, padding: 0,
+                  borderRadius: 3,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 14, lineHeight: 1,
                 }}>
-                {theme === 'light' ? '🌙' : '☀️'}
+                {theme === 'light' ? <Moon size={15} /> : <Sun size={15} />}
               </button>
 
               {isAdmin && (
                 <button onClick={() => setShowAdmin(true)} style={{
-                  height: 32, padding: '0 10px', background: '#7c3aed', color: 'white',
-                  border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                  height: 32, padding: '0 10px', background: 'var(--c-text)', color: 'var(--c-bg)',
+                  border: 'none', borderRadius: 3, fontSize: 12, fontWeight: 700, cursor: 'pointer',
                 }}>
                   🛠 Admin
                 </button>
@@ -410,44 +443,34 @@ export default function App() {
 
               {user ? (
                 <>
-                  <button onClick={() => setShowCreate(true)} style={{
-                    height: 32, padding: '0 12px', background: 'green', color: 'white',
-                    border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                  <button className="btn-action" onClick={() => setShowCreate(true)} style={{
+                    height: 32, padding: '0 12px', borderRadius: 3, fontSize: 12, 
                     display: 'flex', alignItems: 'center',
                   }}>
                     {t('add_listing')}
                   </button>
                   <button onClick={() => setRoute('my-listings')} style={{
-                    height: 32, padding: '0 10px', background: 'transparent', color: 'var(--c-muted)',
-                    border: '1px solid var(--c-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer',
+                    height: 32, padding: '0 10px', borderRadius: 3, fontSize: 12,
                   }}>
                     {t('my_listings')}
                   </button>
                   <button onClick={() => setRoute('profile')} style={{
-                    height: 32, padding: '0 10px', background: 'transparent', color: 'var(--c-muted)',
-                    border: '1px solid var(--c-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer',
+                    height: 32, padding: '0 10px', borderRadius: 3, fontSize: 12,
                   }}>
                     {t('profile')}
                   </button>
                   <button onClick={() => supabase.auth.signOut()} style={{
-                    height: 32, padding: '0 10px', background: 'transparent', color: 'var(--c-muted)',
-                    border: '1px solid var(--c-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer',
+                    height: 32, padding: '0 10px', borderRadius: 3, fontSize: 12,
                   }}>
                     {t('logout')}
                   </button>
                 </>
               ) : (
                 <>
-                  <button onClick={() => setRoute('auth')} style={{
-                    height: 32, padding: '0 10px', background: 'transparent', color: 'var(--c-muted)',
-                    border: '1px solid var(--c-border)', borderRadius: 7, fontSize: 12, cursor: 'pointer',
-                  }}>
+                  <button className="btn-hard" onClick={() => setRoute('auth')}>
                     {t('login')}
                   </button>
-                  <button onClick={() => setRoute('auth')} style={{
-                    height: 32, padding: '0 12px', background: 'darkblue', color: 'white',
-                    border: 'none', borderRadius: 7, fontSize: 12, fontWeight: 500, cursor: 'pointer',
-                  }}>
+                  <button className="btn-hard btn-hard-red" onClick={() => setRoute('auth')} style={{ marginLeft: 4 }}>
                     {t('register')}
                   </button>
                 </>
@@ -457,20 +480,19 @@ export default function App() {
               <button onClick={() => setTourOpen(true)}
                 title={t('_tour_title')} aria-label={t('_tour_title')}
                 style={{
-                  minWidth: 32, height: 32, padding: 0, background: 'transparent',
-                  border: '1px solid var(--c-border)', borderRadius: 7, cursor: 'pointer',
+                  minWidth: 32, height: 32, padding: 0,
+                  borderRadius: 3,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 14, lineHeight: 1, color: 'var(--c-muted)',
                 }}>
-                ❓
+                <CircleHelp size={16} />
               </button>
 
               {/* Lang switcher */}
               <select value={lang} onChange={e => setLang(e.target.value as 'cz' | 'en')}
                 aria-label={lang === 'cz' ? 'Přepnout jazyk' : 'Switch language'}
                 style={{
-                  height: 32, padding: '0 6px', background: 'transparent',
-                  border: '1px solid var(--c-border)', borderRadius: 7,
+                  height: 32, padding: '0 6px', borderRadius: 3,
                   fontSize: 11, color: 'var(--c-muted)', cursor: 'pointer', outline: 'none',
                 }}>
                 <option value="cz">🇨🇿 CZ</option>
@@ -499,7 +521,7 @@ export default function App() {
             isMobile={isMobile}
             isochroneAutoShowMap={() => { if (isMobile) setShowMap(true) }}
             onSaveFilters={() => {
-              if (user) { setWatchcatsOpenComposer(true); setRoute('watchcats') }
+              if (user) { setNotificationsOpenComposer(true); setRoute('notifications') }
               else setRoute('auth')
             }}
           />
@@ -535,9 +557,6 @@ export default function App() {
           <AdminPanel onClose={() => setShowAdmin(false)} />
         </Suspense>
       )}
-
-      {/* ═══ Cookie consent ═══ */}
-      <CookieConsent />
 
       {/* ═══ Feature tour ═══ */}
       <FeatureTour open={tourOpen} onClose={() => setTourOpen(false)} />
@@ -578,7 +597,7 @@ function MoreMenu({ children }: { children: React.ReactNode }) {
         aria-label="More"
         style={{
           width: 32, height: 32, padding: 0, background: 'transparent',
-          border: '1px solid var(--c-border)', borderRadius: 7, cursor: 'pointer', flexShrink: 0,
+          border: '1px solid var(--c-border)', borderRadius: 3, cursor: 'pointer', flexShrink: 0,
           fontSize: 16, lineHeight: 1, color: 'var(--c-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
         ⋯
@@ -587,7 +606,7 @@ function MoreMenu({ children }: { children: React.ReactNode }) {
         <div style={{
           position: 'absolute', top: '100%', right: 0, marginTop: 4, zIndex: 100,
           background: 'var(--c-surface)', border: '1px solid var(--c-border)',
-          borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+          borderRadius: 4, boxShadow: '4px 4px 0 var(--c-text)',
           minWidth: 180, overflow: 'hidden', padding: 4,
         }}>
           {children}
@@ -601,7 +620,7 @@ function MoreItem({ onClick, children }: { onClick: () => void; children: React.
   return (
     <button onClick={onClick} style={{
       display: 'block', width: '100%', textAlign: 'left', padding: '10px 12px',
-      border: 'none', borderRadius: 6, background: 'transparent', cursor: 'pointer',
+      border: 'none', borderRadius: 3, background: 'transparent', cursor: 'pointer',
       fontSize: 13, color: 'var(--c-text)', whiteSpace: 'nowrap',
     }}
       onMouseEnter={e => (e.currentTarget.style.background = 'var(--c-bg)')}
@@ -643,7 +662,7 @@ function FavoritesPage({ listingIds, onSelectListing, onBack }: {
         </h2>
         <button onClick={onBack}
           style={{
-            padding: '6px 14px', border: '1px solid var(--c-border)', borderRadius: 8,
+            padding: '6px 14px', border: '1px solid var(--c-border)', borderRadius: 3,
             background: 'var(--c-surface)', color: 'var(--c-text)',
             fontSize: 12, cursor: 'pointer',
           }}>
@@ -658,13 +677,13 @@ function FavoritesPage({ listingIds, onSelectListing, onBack }: {
         {listings.map((l: any) => (
           <div key={l.id} onClick={() => onSelectListing(l.id)}
             style={{
-              padding: '10px 14px', background: 'var(--c-surface)', borderRadius: 10,
+              padding: '10px 14px', background: 'var(--c-surface)', borderRadius: 4,
               border: '1px solid var(--c-border)', cursor: 'pointer',
               display: 'flex', alignItems: 'center', gap: 12,
             }}>
             {/* Thumbnail */}
             <div style={{
-              width: 52, height: 52, borderRadius: 8, flexShrink: 0,
+              width: 52, height: 52, borderRadius: 3, flexShrink: 0,
               overflow: 'hidden', background: 'var(--c-bg)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>

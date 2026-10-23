@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import type { Listing } from '../lib/types'
 import { PROPERTY_TYPE_LABELS } from '../lib/types'
 import { formatPrice, formatDate, getImageUrl } from '../lib/utils'
-import maplibregl from 'maplibre-gl'
+import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useLang } from '../lib/lang'
 import { setListingMeta, setListingStructuredData } from '../lib/seo'
@@ -33,7 +33,7 @@ function MiniMap({ lat, lng }: { lat: number; lng: number; title: string }) {
   return (
     <div style={{ marginBottom: 20 }}>
       <h3 style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 8px' }}>{t('_detail_location')}</h3>
-      <div ref={ref} style={{ width: '100%', height: 200, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--c-border)' }} />
+      <div ref={ref} style={{ width: '100%', height: 200, borderRadius: 4, overflow: 'hidden', border: '1px solid var(--c-border)' }} />
     </div>
   )
 }
@@ -103,7 +103,7 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
       const { data: ownerData } = await supabase.rpc('get_listing_owner_info', {
         listing_id: listingId,
       }) as any
-      ;(data as any).owner = ownerData?.[0] ?? null
+        ; (data as any).owner = ownerData?.[0] ?? null
 
       setListing(data as FullListing)
       setLoading(false)
@@ -163,11 +163,11 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
   }, [listingId])
 
   const amenities = listing ? [
-    listing.furnished    && t('amenities_furnished'),
+    listing.furnished && t('amenities_furnished'),
     listing.pets_allowed && t('amenities_pets'),
-    listing.parking      && t('amenities_parking'),
-    listing.balcony      && t('amenities_balcony'),
-    listing.cellar       && t('amenities_cellar'),
+    listing.parking && t('amenities_parking'),
+    listing.balcony && t('amenities_balcony'),
+    listing.cellar && t('amenities_cellar'),
   ].filter(Boolean) : []
 
   return (
@@ -178,9 +178,9 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
       <div style={{
         width: 'min(80%, 900px)',
         height: '85vh', maxHeight: window.innerWidth < 768 ? '100dvh' : '85vh',
-        background: 'var(--c-surface)', borderRadius: window.innerWidth < 768 ? 0 : 16,
+        background: 'var(--c-surface)', borderRadius: window.innerWidth < 768 ? 0 : 6,
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
-        boxShadow: window.innerWidth < 768 ? 'none' : '0 24px 64px rgba(0,0,0,0.35)',
+        boxShadow: window.innerWidth < 768 ? 'none' : '6px 6px 0 var(--c-text)',
         position: 'relative',
       }}>
 
@@ -220,7 +220,7 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
 
         {loading && (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-            <div style={{ width: 28, height: 28, borderRadius: '50%', border: '2.5px solid #2563eb', borderTopColor: 'transparent', animation: 'spin 0.7s linear infinite' }} />
+            <div style={{ width: 28, height: 28, borderRadius: '50%', border: '2.5px solid var(--c-accent)', borderTopColor: 'transparent', animation: 'spin 0.7s linear infinite' }} />
             <span style={{ fontSize: 12, color: 'var(--c-faint)' }}>{t('_detail_loading')}</span>
           </div>
         )}
@@ -229,7 +229,7 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
           <div style={{
             position: 'absolute', bottom: 256, left: '50%', transform: 'translateX(-50%)', zIndex: 20,
             background: 'rgba(18, 166, 45, 0.88)', color: 'white', fontSize: 13, padding: '8px 18px',
-            borderRadius: 8, whiteSpace: 'nowrap', pointerEvents: 'none',
+            borderRadius: 3, whiteSpace: 'nowrap', pointerEvents: 'none',
             transition: 'opacity 0.2s',
           }}>
             {t('_detail_share_copied')}
@@ -240,7 +240,7 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 32 }}>
             <span style={{ fontSize: 40 }}>😕</span>
             <p style={{ color: 'var(--c-muted)', fontSize: 14, textAlign: 'center', maxWidth: 280 }}>{errorMsg}</p>
-            <button onClick={onClose} style={{ padding: '8px 20px', border: '1px solid var(--c-border)', borderRadius: 8, background: 'var(--c-surface)', cursor: 'pointer', fontSize: 13, color: 'var(--c-text)' }}>{t('_detail_close')}</button>
+            <button onClick={onClose} style={{ padding: '8px 20px', border: '1px solid var(--c-border)', borderRadius: 3, background: 'var(--c-surface)', cursor: 'pointer', fontSize: 13, color: 'var(--c-text)' }}>{t('_detail_close')}</button>
           </div>
         )}
 
@@ -258,7 +258,7 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
                     style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.95, cursor: 'pointer' }}
                     onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
                   />
-                  <div style={{ position: 'absolute', top: 12, left: 12, background: 'rgba(0,0,0,0.5)', color: 'white', fontSize: 11, padding: '3px 8px', borderRadius: 6 }}>
+                  <div style={{ position: 'absolute', top: 12, left: 12, background: 'rgba(0,0,0,0.5)', color: 'white', fontSize: 11, padding: '3px 8px', borderRadius: 3 }}>
                     {activeImg + 1} / {listing.image_paths.length}
                   </div>
                   {/* Maximize button */}
@@ -266,7 +266,7 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
                     title="Zobrazit na celou obrazovku"
                     style={{
                       position: 'absolute', bottom: 12, right: 12, zIndex: 5,
-                      width: 32, height: 32, borderRadius: 6, border: 'none',
+                      width: 32, height: 32, borderRadius: 3, border: 'none',
                       background: 'rgba(0,0,0,0.5)', color: 'white', fontSize: 14,
                       cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
                       opacity: 0.8, transition: 'opacity 0.2s',
@@ -282,7 +282,7 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
                         style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', width: 36, height: 36, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.4)', color: 'white', fontSize: 20, cursor: 'pointer' }}>›</button>
                       <div style={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 5 }}>
                         {listing.image_paths.map((_, i) => (
-                          <button key={i} onClick={() => setActiveImg(i)} style={{ width: i === activeImg ? 20 : 7, height: 7, borderRadius: 4, border: 'none', background: i === activeImg ? 'white' : 'rgba(255,255,255,0.5)', cursor: 'pointer', padding: 0, transition: 'all 0.2s' }} />
+                          <button key={i} onClick={() => setActiveImg(i)} style={{ width: i === activeImg ? 20 : 7, height: 7, borderRadius: 2, border: 'none', background: i === activeImg ? 'white' : 'rgba(255,255,255,0.5)', cursor: 'pointer', padding: 0, transition: 'all 0.2s' }} />
                         ))}
                       </div>
                     </>
@@ -318,7 +318,7 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
                   position: 'absolute', bottom: 24, left: '50%', transform: 'translateX(-50%)',
                   display: 'flex', alignItems: 'center', gap: 12, zIndex: 5,
                 }}>
-                  <div style={{ background: 'rgba(255,255,255,0.15)', color: 'white', fontSize: 12, padding: '4px 12px', borderRadius: 6 }}>
+                  <div style={{ background: 'rgba(255,255,255,0.15)', color: 'white', fontSize: 12, padding: '4px 12px', borderRadius: 3 }}>
                     {activeImg + 1} / {listing.image_paths.length}
                   </div>
                 </div>
@@ -332,7 +332,7 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
                     {listing.image_paths.map((_, i) => (
                       <button key={i} onClick={(e) => { e.stopPropagation(); setActiveImg(i) }}
                         style={{
-                          width: i === activeImg ? 22 : 8, height: 8, borderRadius: 4, border: 'none',
+                          width: i === activeImg ? 22 : 8, height: 8, borderRadius: 2, border: 'none',
                           background: i === activeImg ? 'white' : 'rgba(255,255,255,0.4)',
                           cursor: 'pointer', padding: 0, transition: 'all 0.2s',
                         }} />
@@ -386,7 +386,7 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
                   <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--c-text)', lineHeight: 1.3, margin: 0 }}>{listing.title}</h1>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{ fontSize: 22, fontWeight: 700, color: '#2563eb' }}>{formatPrice(listing.price_total_czk)}</div>
+                    <div className="num" style={{ fontSize: 24, fontWeight: 800, color: 'var(--c-text)', letterSpacing: '-0.02em' }}>{formatPrice(listing.price_total_czk)}</div>
                     {listing.utilities_czk > 0 && (
                       <div style={{ fontSize: 11, color: 'var(--c-muted)', marginTop: 2 }}>
                         nájem {formatPrice(listing.price_czk)} + zálohy {listing.utilities_czk.toLocaleString('cs-CZ')} Kč
@@ -408,8 +408,8 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
                     [t('_detail_available'), formatDate(listing.available_from)],
                     [t('_detail_min_lease'), `${listing.min_lease_months} ${t('_detail_month')}`],
                     listing.deposit_czk ? [t('_detail_deposit'), `${listing.deposit_czk.toLocaleString('cs-CZ')} Kč`] : null,
-                  ] as ([string,string]|null)[])
-                    .filter((x): x is [string,string] => x !== null)
+                  ] as ([string, string] | null)[])
+                    .filter((x): x is [string, string] => x !== null)
                     .map(([k, v]) => (
                       <div key={k}>
                         <div style={{ fontSize: 10, color: 'var(--c-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, marginBottom: 2 }}>{k}</div>
@@ -422,7 +422,7 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
                 {amenities.length > 0 && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 20 }}>
                     {(amenities as string[]).map(a => (
-                      <span key={a} style={{ padding: '4px 10px', background: 'var(--c-bg)', border: '1px solid var(--c-border)', borderRadius: 20, fontSize: 12, color: 'var(--c-text)' }}>{a}</span>
+                      <span key={a} style={{ padding: '4px 10px', background: 'var(--c-bg)', border: '1px solid var(--c-border)', borderRadius: 6, fontSize: 12, color: 'var(--c-text)' }}>{a}</span>
                     ))}
                   </div>
                 )}
@@ -470,7 +470,7 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
                       <img key={i} src={getImageUrl(path)} alt=""
                         onClick={() => setActiveImg(i)}
                         onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-                        style={{ width: 56, height: 48, objectFit: 'cover', borderRadius: 6, cursor: 'pointer', border: i === activeImg ? '2px solid var(--c-accent)' : '1px solid var(--c-border)', opacity: i === activeImg ? 1 : 0.65, transition: 'all 0.15s' }} />
+                        style={{ width: 56, height: 48, objectFit: 'cover', borderRadius: 3, cursor: 'pointer', border: i === activeImg ? '2px solid var(--c-accent)' : '1px solid var(--c-border)', opacity: i === activeImg ? 1 : 0.65, transition: 'all 0.15s' }} />
                     ))}
                   </div>
                 )}
@@ -478,7 +478,7 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
 
               {/* Right — contact */}
               <div style={{ width: window.innerWidth < 768 ? '100%' : 220, flexShrink: 0 }}>
-                <div style={{ border: '1px solid var(--c-border)', borderRadius: 12, padding: 16, position: 'sticky', top: 0 }}>
+                <div style={{ border: '1px solid var(--c-border)', borderRadius: 5, padding: 16, position: 'sticky', top: 0 }}>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
                     <div style={{ width: 42, height: 42, borderRadius: '50%', background: 'var(--c-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden' }}>
@@ -501,12 +501,12 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
                           <span style={{ color: 'var(--c-muted)', fontSize: 13 }}>{t('_detail_no_phone')}</span>
                         )}
                         {listing.owner?.email && (
-                          <a href={`mailto:${listing.owner.email}`} style={{ fontSize: 13, color: '#2563eb', wordBreak: 'break-all' }}>{listing.owner.email}</a>
+                          <a href={`mailto:${listing.owner.email}`} style={{ fontSize: 13, color: 'var(--c-accent)', wordBreak: 'break-all' }}>{listing.owner.email}</a>
                         )}
                         <p style={{ fontSize: 11, color: 'var(--c-muted)' }}>{t('_detail_contact_note')}</p>
                       </div>
                     ) : (
-                      <button onClick={() => setShowContact(true)} style={{ width: '100%', padding: '11px 0', background: 'var(--c-green)', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                      <button onClick={() => setShowContact(true)} style={{ width: '100%', padding: '11px 0', background: 'var(--c-green)', color: 'white', border: 'none', borderRadius: 3, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
                         {t('_detail_contact_btn')}
                       </button>
                     )
@@ -517,7 +517,7 @@ export function ListingDetail({ listingId, onClose, onRequestAuth, user: propUse
                       </p>
                       <button
                         onClick={() => { onClose(); onRequestAuth?.() }}
-                        style={{ width: '100%', padding: '10px 0', background: 'var(--c-accent)', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
+                        style={{ width: '100%', padding: '10px 0', background: 'var(--c-action)', boxShadow: '0 2px 0 var(--c-action-step)', color: 'white', border: 'none', borderRadius: 3, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
                       >
                         {t('_detail_login_btn')}
                       </button>

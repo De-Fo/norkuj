@@ -38,7 +38,7 @@ export function ContractModal({ listing, onClose }: Props) {
         placeholder="…"
         style={{
           width: '100%', resize: 'vertical', padding: '7px 9px',
-          border: '1px solid var(--c-border)', borderRadius: 8,
+          border: '1px solid var(--c-border)', borderRadius: 3,
           background: 'var(--c-bg)', color: 'var(--c-text)', fontSize: 13, outline: 'none',
         }}
       />
@@ -50,20 +50,20 @@ export function ContractModal({ listing, onClose }: Props) {
       style={{
         position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        zIndex: 80, padding: window.innerWidth < 768 ? 0 : 16,
+        zIndex: 80, padding: window.innerWidth < 768 ? 0 : 6,
       }}>
       <div style={{
-        background: 'var(--c-surface)', borderRadius: window.innerWidth < 768 ? 0 : 16,
+        background: 'var(--c-surface)', borderRadius: window.innerWidth < 768 ? 0 : 6,
         maxWidth: 560, width: '100%',
         maxHeight: window.innerWidth < 768 ? '100dvh' : '90dvh',
         height: window.innerWidth < 768 ? '100dvh' : undefined,
         display: 'flex', flexDirection: 'column',
-        boxShadow: window.innerWidth < 768 ? 'none' : '0 24px 64px rgba(0,0,0,0.35)',
+        boxShadow: window.innerWidth < 768 ? 'none' : '6px 6px 0 var(--c-text)',
         overflow: 'hidden',
       }}>
         {/* Header — thin accent band + title */}
         <div style={{ flexShrink: 0 }}>
-          <div style={{ height: 3, background: 'var(--c-accent, #2563eb)' }} />
+          <div style={{ height: 3, background: 'var(--c-accent)' }} />
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--c-border)' }}>
             <div>
               <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--c-text)' }}>{t('_mylistings_contract_title')}</div>
@@ -182,7 +182,7 @@ export function ContractModal({ listing, onClose }: Props) {
             <div style={{ display: 'flex', gap: 20, marginTop: 10 }}>
               {[{ title: cs ? 'Pronajímatel' : 'Landlord', name: owner }, { title: cs ? 'Nájemce' : 'Tenant', name: tenant }].map(box => (
                 <div key={box.title} style={{
-                  flex: 1, border: '1px solid #cbd5e1', borderRadius: 6, padding: '14px 16px',
+                  flex: 1, border: '1px solid #cbd5e1', borderRadius: 3, padding: '14px 16px',
                   display: 'flex', flexDirection: 'column', gap: 26, minHeight: 92,
                 }}>
                   <div style={{ fontSize: 11, fontWeight: 600, color: '#0f172a' }}>{box.title}</div>
@@ -205,7 +205,7 @@ export function ContractModal({ listing, onClose }: Props) {
             {cs ? 'Návrh — zkontroluj u advokáta' : 'Draft — check with a lawyer'}
           </span>
           <button onClick={() => window.print()}
-            style={{ padding: '9px 16px', fontSize: 12, border: 'none', borderRadius: 7, background: 'var(--c-accent, #2563eb)', color: '#fff', cursor: 'pointer' }}>
+            style={{ padding: '9px 16px', fontSize: 12, border: 'none', borderRadius: 3, background: 'var(--c-action)', boxShadow: '0 2px 0 var(--c-action-step)', color: '#fff', cursor: 'pointer' }}>
             {t('_mylistings_contract_generate')}
           </button>
         </div>

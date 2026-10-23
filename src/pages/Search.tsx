@@ -267,8 +267,45 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
     ? listingsFilteredByIso.filter(l => l.transit_status !== 'grey')
     : listingsFilteredByIso
 
+  // ── Resizable list column (desktop): drag the divider, 320px up to 50% of the window, remembered ──
+  const MIN_LIST = 320
+  const dragCleanup = useRef<(() => void) | null>(null)
+  const [listWidth, setListWidth] = useState<number>(() => {
+    try { const v = Number(localStorage.getItem('norkuj-list-width')); return v >= MIN_LIST ? v : 0 } catch { return 0 }
+  })
+  const clampList = (w: number) => Math.round(Math.min(Math.max(w, MIN_LIST), Math.floor(window.innerWidth * 0.5)))
+  const startResize = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    const startX = e.clientX
+    const startW = (e.currentTarget.nextElementSibling as HTMLElement | null)?.getBoundingClientRect().width
+      ?? (e.currentTarget.previousElementSibling as HTMLElement | null)?.getBoundingClientRect().width ?? MIN_LIST
+    let latest = startW
+    const move = (ev: PointerEvent) => { latest = clampList(startW + (ev.clientX - startX)); setListWidth(latest) }
+    const stop = (save: boolean) => {
+      window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', cancel)
+      document.body.style.userSelect = ''; document.body.style.cursor = ''; document.body.classList.remove('is-resizing')
+      dragCleanup.current = null
+      if (save) { try { localStorage.setItem('norkuj-list-width', String(latest)) } catch { /* private mode */ } }
+    }
+    const up = () => stop(true)
+    const cancel = () => stop(false)
+    document.body.style.userSelect = 'none'; document.body.style.cursor = 'col-resize'; document.body.classList.add('is-resizing')
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', cancel)
+    dragCleanup.current = () => stop(false)
+  }
+  // if the page unmounts mid-drag, release the listeners and the body styles
+  useEffect(() => () => { dragCleanup.current?.() }, [])
+  const onDividerKey = (e: React.KeyboardEvent) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+    e.preventDefault()
+    const base = listWidth || Math.min(720, Math.max(420, window.innerWidth * 0.38))
+    const next = clampList(base + (e.key === 'ArrowRight' ? 24 : -24))
+    setListWidth(next)
+    try { localStorage.setItem('norkuj-list-width', String(next)) } catch { /* private mode */ }
+  }
+
   return (
-    <div style={{ display: 'flex', flex: 1, overflow: 'hidden', height: '100%' }}>
+    <div style={{ display: 'flex', flex: 1, overflow: 'hidden', height: '100%', flexDirection: isMobile ? undefined : 'row-reverse' }}>
       {/* SEO h1 - visually hidden, crawl-visible */}
       <h1 className="sr-only">{t('_search_h1')}</h1>
 
@@ -280,7 +317,7 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
         inset: isMobile ? 0 : undefined,
         zIndex: isMobile ? 10 : undefined,
         minWidth: isMobile ? '100%' : 0,
-        maxWidth: isMobile ? '100%' : (showMap ? '50%' : '0%'),
+        maxWidth: isMobile ? '100%' : (showMap ? '100%' : '0%'),
         overflow: 'hidden',
         opacity: isMobile ? 1 : (showMap ? 1 : 0),
         transition: 'max-width 0.3s ease, opacity 0.2s ease',
@@ -312,10 +349,10 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
           <button onClick={onToggleMap}
             style={{
               position: 'absolute', top: 8, left: 8,
-              padding: '6px 12px', borderRadius: 8, cursor: 'pointer',
+              padding: '6px 12px', borderRadius: 3, cursor: 'pointer',
               background: 'var(--c-surface)', color: 'var(--c-text)',
               border: '1px solid var(--c-border)', fontSize: 12, fontWeight: 500,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+              boxShadow: '2px 2px 0 var(--c-text)',
               pointerEvents: 'auto',
             }}>
             {t('mobile_list_btn_back')}
@@ -323,12 +360,19 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
         </div>
       )}
 
+      {/* Drag handle between list (left) and map (right): pointer drag or arrow keys */}
+      {!isMobile && showMap && (
+        <div role="separator" aria-orientation="vertical" aria-label={t('resize_panel')} tabIndex={0}
+          onPointerDown={startResize} onKeyDown={onDividerKey}
+          onDoubleClick={() => { setListWidth(0); try { localStorage.removeItem('norkuj-list-width') } catch { /* ignore */ } }}
+          className="panel-divider" />
+      )}
+
       <div style={{
-        width: isMobile ? '100%' : (showMap ? '50%' : '100%'),
+        width: isMobile ? '100%' : (showMap ? (listWidth ? `min(${listWidth}px, 50vw)` : 'clamp(420px, 38vw, 720px)') : '100%'),
         maxWidth: (!isMobile && !showMap) ? 960 : undefined,
         margin: (!isMobile && !showMap) ? '0 auto' : undefined,
         display: 'flex', flexDirection: 'column',
-        borderLeft: (!isMobile && showMap) ? '1px solid var(--c-border)' : 'none',
         background: 'var(--c-bg)', overflow: 'hidden', flexShrink: 0,
         zIndex: isMobile && showMap ? 5 : undefined,
       }}>
@@ -338,8 +382,9 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
         <div style={{
           padding: isMobile ? '6px 8px' : '8px 12px', borderBottom: '1px solid var(--c-border)',
           background: 'var(--c-surface)', flexShrink: 0,
-          display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
+          display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8,
         }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           {isoCenter ? (
             <>
               <span style={{ fontSize: isMobile ? 11 : 11, color: 'var(--c-muted)', whiteSpace: 'nowrap' }}>
@@ -356,14 +401,14 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
                 }}
                 style={{
                   width: 48, padding: isMobile ? '6px 6px' : '2px 6px', border: '1px solid var(--c-border)',
-                  borderRadius: 4, fontSize: 12, color: 'var(--c-text)', background: 'var(--c-surface)',
+                  borderRadius: 2, fontSize: 12, color: 'var(--c-text)', background: 'var(--c-surface)',
                   outline: 'none', textAlign: 'center', minHeight: isMobile ? 36 : undefined,
                 }} />
               <span style={{ fontSize: 11, color: 'var(--c-muted)' }}>{t('iso_minutes')}</span>
               {isoLoading && <span style={{ fontSize: 10, color: 'var(--c-faint)' }}>{t('iso_loading')}</span>}
               <button onClick={() => { setIsoCenter(null); setIsoPolygon(null) }}
                 style={{
-                  padding: isMobile ? '6px 10px' : '2px 7px', border: '1px solid var(--c-border)', borderRadius: 4,
+                  padding: isMobile ? '6px 10px' : '2px 7px', border: '1px solid var(--c-border)', borderRadius: 2,
                   background: 'transparent', fontSize: 10, color: 'var(--c-muted)', cursor: 'pointer',
                   minHeight: isMobile ? 34 : undefined,
                 }}>
@@ -374,39 +419,38 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <button onClick={() => setIsoModeActive(v => !v)}
                 style={{
-                  padding: isMobile ? '7px 12px' : '4px 10px', borderRadius: 6, cursor: 'pointer',
-                  border: isoModeActive ? 'none' : '1px solid var(--c-border)',
-                  background: isoModeActive ? '#2563eb' : 'transparent',
-                  color: isoModeActive ? '#fff' : 'var(--c-muted)',
-                  fontSize: isMobile ? 12 : 11, fontWeight: isoModeActive ? 600 : 400,
+                  padding: isMobile ? '7px 12px' : '4px 10px', borderRadius: 3, cursor: 'pointer',
+                  border: isoModeActive ? 'none' : '1px solid var(--c-border-md)',
+                  background: isoModeActive ? 'var(--c-accent)' : 'var(--c-surface)',
+                  color: isoModeActive ? 'var(--c-on-accent)' : 'var(--c-text)',
+                  fontSize: isMobile ? 12 : 12, fontWeight: 700,
                   whiteSpace: 'nowrap', minHeight: isMobile ? 36 : undefined,
                 }}>
                 {t('iso_label')}
               </button>
               {!isoModeActive &&
-                <span style={{ fontSize: 10, color: 'var(--c-muted)', fontWeight: 500, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span style={{ fontSize: 11, color: 'var(--c-text-secondary)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
                   <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--c-accent)', opacity: 0.7, animation: 'pulse-iso 2s ease-in-out infinite' }} />
                   {t('iso_description')}
                 </span>
               }
               {isoModeActive &&
-                <span style={{ fontSize: 10, color: '#2563eb', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: 10, color: 'var(--c-accent)', fontWeight: 500, whiteSpace: 'nowrap' }}>
                   {t('iso_active')}
                 </span>
               }
             </div>
           )}
+          </div>
 
-          {/* Sort + map toggle — locked to right edge */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 3 : 6, marginLeft: 'auto', flexShrink: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-              <select value={filters.sortBy} onChange={e => onChange({ ...filters, sortBy: e.target.value as any })}
+          {/* Sort + map toggle: second row, left-aligned so it never jumps sideways when the panel is resized */}
+          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-start', gap: isMobile ? 6 : 8, minWidth: 0 }}>
+            <div role="group" aria-label={t('sort_label')} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {!isMobile && <label htmlFor="sort-by" style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-text-secondary)', whiteSpace: 'nowrap' }}>{t('sort_label')}</label>}
+              <select id="sort-by" className="sort-select" value={filters.sortBy}
+                onChange={e => onChange({ ...filters, sortBy: e.target.value as SearchFilters['sortBy'] })}
                 aria-label={t('sort_label')}
-                style={{
-                  padding: isMobile ? '6px 8px' : '2px 6px', border: '1px solid var(--c-border)', borderRadius: 4,
-                  fontSize: isMobile ? 11 : 10, color: 'var(--c-muted)', background: 'var(--c-surface)', outline: 'none',
-                  minHeight: isMobile ? 34 : undefined,
-                }}>
+                style={{ minHeight: isMobile ? 36 : 30 }}>
                 <option value="date">{t('sort_date')}</option>
                 <option value="price">{t('sort_price')}</option>
                 <option value="area">{t('sort_area')}</option>
@@ -415,19 +459,19 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
                 aria-label={filters.sortDir === 'desc' ? t('sort_desc') : t('sort_asc')}
                 title={filters.sortDir === 'desc' ? t('sort_desc') : t('sort_asc')}
                 style={{
-                  padding: isMobile ? '6px 8px' : '2px 6px', border: '1px solid var(--c-border)', borderRadius: 4,
-                  background: 'transparent', fontSize: isMobile ? 13 : 11, color: 'var(--c-muted)', cursor: 'pointer',
-                  lineHeight: 1.2, minHeight: isMobile ? 34 : undefined,
+                  padding: isMobile ? '6px 10px' : '4px 10px', border: '1px solid var(--c-border-md)', borderRadius: 3,
+                  background: 'var(--c-surface)', fontSize: 13, fontWeight: 700, color: 'var(--c-text)', cursor: 'pointer',
+                  minHeight: isMobile ? 36 : 30, lineHeight: 1,
                 }}>
                 {filters.sortDir === 'desc' ? '↓' : '↑'}
               </button>
             </div>
 
             <button onClick={onToggleMap} style={{
-              padding: isMobile ? '7px 12px' : '4px 10px', border: '1px solid var(--c-border)', borderRadius: 6,
+              padding: isMobile ? '7px 12px' : '4px 10px', border: '1px solid var(--c-border-md)', borderRadius: 3,
               background: showMap ? 'var(--c-surface)' : 'var(--c-accent)',
-              color: showMap ? 'var(--c-text)' : 'white',
-              fontSize: isMobile ? 12 : 11, cursor: 'pointer', fontWeight: 500,
+              color: showMap ? 'var(--c-text)' : 'var(--c-on-accent)',
+              fontSize: 12, cursor: 'pointer', fontWeight: 600,
               boxShadow: showMap ? 'none' : '0 0 0 2px color-mix(in srgb, var(--c-accent) 40%, transparent)',
               flexShrink: 0, minHeight: isMobile ? 36 : undefined,
               animation: showMap ? 'none' : 'pulse-map 2s ease-in-out infinite',
@@ -441,7 +485,7 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
           {loading && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {[1,2,3,4,5].map(i => (
-                <div key={i} style={{ height: 78, borderRadius: 10, background: 'var(--c-surface)', border: '1px solid var(--c-border)', opacity: 0.6 }} />
+                <div key={i} style={{ height: 78, borderRadius: 4, background: 'var(--c-surface)', border: '1px solid var(--c-border)', opacity: 0.6 }} />
               ))}
             </div>
           )}
@@ -521,12 +565,12 @@ export function SearchPage({ filters, onChange, showMap, onToggleMap, onListingC
 function BeforeFooter() {
   const { t } = useLang()
   return (
-    <div style={{ padding: '24px 16px 8px', borderTop: '1px solid var(--c-border)', maxWidth: 900, margin: '0 auto', width: '100%' }}>
+    <div style={{ padding: '24px 16px 8px', borderTop: '1px solid var(--c-border)', maxWidth: 900, margin: '10vh auto 0', width: '100%' }}>
       <h2 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8, color: 'var(--c-text)' }}>{t('_search_h1')}</h2>
       <p style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--c-text-secondary)', marginBottom: 16 }}>{t('_search_intro')}</p>
 
       {/* FAQ - the whole block is one collapsible unit */}
-      <details style={{ margin: '16px 0 8px', border: '1px solid var(--c-border)', borderRadius: 8, background: 'var(--c-surface)' }}>
+      <details style={{ margin: '16px 0 8px', border: '1px solid var(--c-border)', borderRadius: 3, background: 'var(--c-surface)' }}>
         <summary style={{
           padding: '10px 12px', cursor: 'pointer', fontWeight: 600, fontSize: 15,
           color: 'var(--c-text)', listStyle: 'none',

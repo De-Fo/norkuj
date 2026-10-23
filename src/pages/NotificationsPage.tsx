@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import { Bell } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useLang } from '../lib/lang'
 import { DEFAULT_FILTERS } from '../lib/types'
@@ -10,7 +11,7 @@ import { ListingCard } from '../components/ListingCard'
 import { FilterPanel } from '../components/FilterPanel'
 import { pushSupported, enablePush, disablePush, isPushActive } from '../lib/push'
 
-type WatchCat = {
+type SavedSearch = {
   id: string
   user_id: string
   name: string
@@ -19,7 +20,7 @@ type WatchCat = {
   created_at: string
 }
 
-const MAX_WATCHCATS = 3
+const MAX_NOTIFICATIONS = 3
 const PREVIEW_COUNT = 4
 
 function matches(f: SearchFilters, l: any): boolean {
@@ -53,21 +54,21 @@ function filterSummary(f: SearchFilters): string {
 }
 
 function makeSeenStore() {
-  const key = (watchCatId: string) => `wc_seen_${watchCatId}`
+  const key = (savedSearchId: string) => `wc_seen_${savedSearchId}`
   return {
-    get: (watchCatId: string): Set<string> => {
+    get: (savedSearchId: string): Set<string> => {
       try {
-        const raw = localStorage.getItem(key(watchCatId))
+        const raw = localStorage.getItem(key(savedSearchId))
         return new Set(raw ? JSON.parse(raw) : [])
       } catch { return new Set() }
     },
-    set: (watchCatId: string, ids: Set<string>) => {
-      try { localStorage.setItem(key(watchCatId), JSON.stringify([...ids])) } catch {}
+    set: (savedSearchId: string, ids: Set<string>) => {
+      try { localStorage.setItem(key(savedSearchId), JSON.stringify([...ids])) } catch {}
     },
   }
 }
 
-export function WatchCatPage({ user, currentFilters, openComposer, onComposerConsumed, onGoHome, onApply, onListingClick, isMobile, isAdmin }: {
+export function NotificationsPage({ user, currentFilters, openComposer, onComposerConsumed, onGoHome, onApply, onListingClick, isMobile, isAdmin }: {
   user: User
   currentFilters: SearchFilters
   openComposer?: boolean
@@ -79,7 +80,7 @@ export function WatchCatPage({ user, currentFilters, openComposer, onComposerCon
   isAdmin?: boolean
 }) {
   const { t } = useLang()
-  const [cats, setCats] = useState<WatchCat[]>([])
+  const [cats, setCats] = useState<SavedSearch[]>([])
   const [base, setBase] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -125,11 +126,11 @@ export function WatchCatPage({ user, currentFilters, openComposer, onComposerCon
 
   const loadCats = useCallback(async () => {
     const { data, error } = await supabase.from('watch_cats').select('*').order('created_at', { ascending: true })
-    if (error) { if (import.meta.env.DEV) console.error('[watchcats]', error); setCats([]); return }
+    if (error) { if (import.meta.env.DEV) console.error('[notifications]', error); setCats([]); return }
     setCats(data ?? [])
   }, [])
 
-  // Fetch all published listings once, reuse for every watch-cat preview.
+  // Fetch all published listings once, reuse for every saved search preview.
   // Robust: never leave the page stuck on loading — clear it even if the RPC
   // throws, and time out so a hung request can't blank the screen.
   useEffect(() => {
@@ -139,10 +140,10 @@ export function WatchCatPage({ user, currentFilters, openComposer, onComposerCon
     ;(async () => {
       try {
         const { data, error } = await (supabase.rpc as any)('get_published_listings_with_coords')
-        if (error) { if (import.meta.env.DEV) console.error('[watchcats base]', error) }
+        if (error) { if (import.meta.env.DEV) console.error('[notifications base]', error) }
         if (alive) setBase(data ?? [])
       } catch (e) {
-        if (import.meta.env.DEV) console.error('[watchcats base]', e)
+        if (import.meta.env.DEV) console.error('[notifications base]', e)
       } finally {
         clearTimeout(timer)
         finish()
@@ -192,7 +193,7 @@ export function WatchCatPage({ user, currentFilters, openComposer, onComposerCon
     const name = editName.trim()
     if (!name || !editingId) return
     if (!isAdmin && requiresMinPrice(editDraft, isAdmin ?? false)) return
-    if (!isAdmin && !editDraft.maxPrice) return   // price cap required for a watch-cat
+    if (!isAdmin && !editDraft.maxPrice) return   // price cap required for a saved search
     setSaving(true)
     const { error } = await (supabase.from('watch_cats') as any).update({ name, filters: editDraft }).eq('id', editingId)
     setSaving(false)
@@ -202,14 +203,14 @@ export function WatchCatPage({ user, currentFilters, openComposer, onComposerCon
   }
 
   const remove = async (id: string) => {
-    if (!confirm(t('watchcats_delete_confirm'))) return
+    if (!confirm(t('notifications_delete_confirm'))) return
     const { error } = await (supabase.from('watch_cats') as any).delete().eq('id', id)
     if (error) { alert(mapError(error, t)); return }
     await loadCats()
   }
 
   // Enable push for a cat on THIS device (subscription first, then the per-cat flag).
-  const enableCatPush = async (wc: WatchCat): Promise<boolean> => {
+  const enableCatPush = async (wc: SavedSearch): Promise<boolean> => {
     const on = await isPushActive()
     const sub = on ? true : await enablePush()
     if (!sub) return false
@@ -221,7 +222,7 @@ export function WatchCatPage({ user, currentFilters, openComposer, onComposerCon
 
   // Enables when off OR this device isn't subscribed; otherwise disables. Uses the same
   // combined state the button renders, so a fresh device's first click enables, not off.
-  const toggleCatPush = async (wc: WatchCat) => {
+  const toggleCatPush = async (wc: SavedSearch) => {
     if (!pushCapable || pushBusy) return
     setPushBusy(true)
     try {
@@ -229,43 +230,43 @@ export function WatchCatPage({ user, currentFilters, openComposer, onComposerCon
       if (!isOn) {
         const ok = await enableCatPush(wc)
         if (!ok) {
-          flashFeedback(wc.id, 'err', t('watchcats_push_failed'))
+          flashFeedback(wc.id, 'err', t('notifications_push_failed'))
           return
         }
-        flashFeedback(wc.id, 'ok', t('watchcats_push_on_feedback'))
+        flashFeedback(wc.id, 'ok', t('notifications_push_on_feedback'))
       } else {
         const otherOn = cats.some((c) => c.id !== wc.id && c.push_enabled)
         const { error } = await supabase.from('watch_cats').update({ push_enabled: false }).eq('id', wc.id)
         if (error) { if (import.meta.env.DEV) console.error('[push] off', error) }
         if (!otherOn) await disablePush().catch(() => {})   // last cat off → drop browser sub
         setDevicePushOn(!otherOn ? false : devicePushOn)
-        flashFeedback(wc.id, 'ok', t('watchcats_push_off_feedback'))
+        flashFeedback(wc.id, 'ok', t('notifications_push_off_feedback'))
       }
       await loadCats()
     } catch (e) {
       // Brave/ad-blockers block registration → show the settings hint, not a raw error.
       const msg = (e as Error)?.message || ''
       const isBrave = /push service error|registration failed/i.test(msg)
-      flashFeedback(wc.id, 'err', isBrave ? t('watchcats_push_brave_setting') : (msg || t('watchcats_push_failed')))
+      flashFeedback(wc.id, 'err', isBrave ? t('notifications_push_brave_setting') : (msg || t('notifications_push_failed')))
       await loadCats().catch(() => {})
     } finally {
       setPushBusy(false)
     }
   }
 
-  const matching = (wc: WatchCat): any[] => {
+  const matching = (wc: SavedSearch): any[] => {
     const f = { ...DEFAULT_FILTERS, ...wc.filters }
     return base.filter((l) => matches(f, l))
   }
 
-  const markAllSeen = (wc: WatchCat) => {
+  const markAllSeen = (wc: SavedSearch) => {
     const ids = seen.get(wc.id)
     matching(wc).forEach((l) => ids.add(l.id))
     seen.set(wc.id, ids)
-    flashFeedback(wc.id, 'ok', t('watchcats_mark_read_done')) // visible "marked" confirmation
+    flashFeedback(wc.id, 'ok', t('notifications_mark_read_done')) // visible "marked" confirmation
   }
 
-  // Auto-prompt: if the user has push-enabled watch-cats but THIS device hasn't
+  // Auto-prompt: if the user has push-enabled saved searches but THIS device hasn't
   // granted push yet, offer to enable it (on an explicit button, not auto-invoke).
   const pendingPush = pushCapable && !devicePushOn && cats.some((c) => c.push_enabled)
 
@@ -278,26 +279,26 @@ export function WatchCatPage({ user, currentFilters, openComposer, onComposerCon
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
         <div>
           <h2 style={{ fontSize: 19, fontWeight: 700, margin: 0, color: 'var(--c-text)' }}>
-            {t('watchcats_title')}
+            {t('notifications_title')}
           </h2>
           {cats.length > 0 && <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--c-faint)' }}>
-            {cats.length}/{MAX_WATCHCATS} · {t('watchcats_limit')}
+            {cats.length}/{MAX_NOTIFICATIONS} · {t('notifications_limit')}
           </p>}
         </div>
-        <button onClick={onGoHome} style={{ padding: '6px 14px', border: '1px solid var(--c-border)', borderRadius: 8, background: 'var(--c-surface)', color: 'var(--c-text)', fontSize: 12, cursor: 'pointer' }}>
+        <button onClick={onGoHome} style={{ padding: '6px 14px', border: '1px solid var(--c-border)', borderRadius: 3, background: 'var(--c-surface)', color: 'var(--c-text)', fontSize: 12, cursor: 'pointer' }}>
           {t('back_search')}
         </button>
       </header>
 
       {cats.length === 0 && !showCreate && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '40px 12px', textAlign: 'center' }}>
-          <div style={{ fontSize: 44, lineHeight: 1 }}>🐈</div>
-          <p style={{ color: 'var(--c-muted)', fontSize: 14, maxWidth: 400, margin: 0 }}>{t('watchcats_empty')}</p>
+          <Bell size={40} color="var(--c-muted)" strokeWidth={1.5} />
+          <p style={{ color: 'var(--c-muted)', fontSize: 14, maxWidth: 400, margin: 0 }}>{t('notifications_empty')}</p>
           <button onClick={() => { setShowCreate(true); setDraft(currentFilters) }} style={{
-            marginTop: 4, padding: '10px 18px', borderRadius: 10, border: 'none',
-            background: 'var(--c-accent, #2563eb)', color: '#fff', fontSize: 13, cursor: 'pointer',
+            marginTop: 4, padding: '10px 18px', borderRadius: 4, border: 'none',
+            background: 'var(--c-action)', color: '#fff', fontSize: 13, cursor: 'pointer',
           }}>
-            {t('watchcats_new')}
+            {t('notifications_new')}
           </button>
         </div>
       )}
@@ -305,14 +306,14 @@ export function WatchCatPage({ user, currentFilters, openComposer, onComposerCon
       {/* Returners with flagged cats but no sub on this device get an enable button. */}
       {pendingPush && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, padding: '10px 12px',
-          border: '1px solid var(--c-border)', borderRadius: 10, background: 'var(--c-surface)' }}>
-          <span style={{ fontSize: 13, color: 'var(--c-text)', flex: 1 }}>{t('watchcats_push_banner')}</span>
+          border: '1px solid var(--c-border)', borderRadius: 4, background: 'var(--c-surface)' }}>
+          <span style={{ fontSize: 13, color: 'var(--c-text)', flex: 1 }}>{t('notifications_push_banner')}</span>
           <button onClick={async () => {
             const enabled = cats.find((c) => c.push_enabled)
-            if (enabled) { setPushBusy(true); const ok = await enableCatPush(enabled); setPushBusy(false); if (ok) flashFeedback(enabled.id, 'ok', t('watchcats_push_on_feedback')) }
+            if (enabled) { setPushBusy(true); const ok = await enableCatPush(enabled); setPushBusy(false); if (ok) flashFeedback(enabled.id, 'ok', t('notifications_push_on_feedback')) }
           }}
-            style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: 'var(--c-accent, #2563eb)', color: '#fff', fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-            {t('watchcats_push_banner_btn')}
+            style={{ padding: '8px 14px', borderRadius: 3, border: 'none', background: 'var(--c-action)', boxShadow: '0 2px 0 var(--c-action-step)', color: '#fff', fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            {t('notifications_push_banner_btn')}
           </button>
         </div>
       )}
@@ -322,17 +323,17 @@ export function WatchCatPage({ user, currentFilters, openComposer, onComposerCon
         const unknown = m.filter((l) => !seen.get(wc.id).has(l.id)).length
         const isEditing = editingId === wc.id
         return (
-          <div key={wc.id} style={{ border: '1px solid var(--c-border)', borderRadius: 14, padding: 14, marginBottom: 12, background: 'var(--c-surface)' }}>
+          <div key={wc.id} style={{ border: '1px solid var(--c-border)', borderRadius: 6, padding: 14, marginBottom: 12, background: 'var(--c-surface)' }}>
 
             {/* ── Card header: name (left) · push toggle + actions (right) ── */}
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--c-text)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  🐱 {wc.name}
+                  <Bell size={15} color="var(--c-muted)" /> {wc.name}
                   {unknown > 0 && <span style={{
-                    background: '#16a34a', color: '#fff', borderRadius: 999, fontSize: 11,
+                    background: '#16a34a', color: '#fff', borderRadius: 4, fontSize: 11,
                     padding: '1px 8px', lineHeight: '18px', flexShrink: 0,
-                  }}>{unknown} {t('watchcats_new_count')}</span>}
+                  }}>{unknown} {t('notifications_new_count')}</span>}
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--c-muted)', marginTop: 2 }}>{filterSummary({ ...DEFAULT_FILTERS, ...wc.filters })}</div>
               </div>
@@ -344,32 +345,32 @@ export function WatchCatPage({ user, currentFilters, openComposer, onComposerCon
                   <>
                     {pushCapable ? (
                       <button onClick={() => toggleCatPush(wc)} disabled={pushBusy}
-                        role="switch" aria-checked={wc.push_enabled && devicePushOn} aria-label={t('watchcats_push_label')}
-                        title={t('watchcats_push_label')}
+                        role="switch" aria-checked={wc.push_enabled && devicePushOn} aria-label={t('notifications_push_label')}
+                        title={t('notifications_push_label')}
                         style={{
                           display: 'flex', alignItems: 'center', gap: 6, height: 32, padding: '0 6px 0 12px',
-                          borderRadius: 999, cursor: pushBusy ? 'wait' : 'pointer',
+                          borderRadius: 4, cursor: pushBusy ? 'wait' : 'pointer',
                           border: '1px solid var(--c-border)', background: 'transparent', flexShrink: 0,
                           opacity: pushBusy ? 0.6 : 1,
                         }}>
                         <span style={{ fontSize: 12, color: 'var(--c-muted)', whiteSpace: 'nowrap' }}>
                           {wc.push_enabled && devicePushOn ? t('push_on') : t('push_off')}
                         </span>
-                        <span style={{ width: 30, height: 18, borderRadius: 999, position: 'relative', flexShrink: 0,
-                          background: wc.push_enabled && devicePushOn ? '#2563eb' : 'var(--c-border-md)', transition: 'background 0.15s' }}>
+                        <span style={{ width: 30, height: 18, borderRadius: 4, position: 'relative', flexShrink: 0,
+                          background: wc.push_enabled && devicePushOn ? 'var(--c-accent)' : 'var(--c-border-md)', transition: 'background 0.15s' }}>
                           <span style={{ width: 14, height: 14, borderRadius: '50%', background: '#fff', position: 'absolute', top: 2,
                             transition: 'left 0.15s', left: wc.push_enabled && devicePushOn ? 14 : 2, boxShadow: '0 1px 2px rgba(0,0,0,0.25)' }} />
                         </span>
                       </button>
                     ) : (
-                      <span title={t('watchcats_push_unavailable')} style={{ fontSize: 10, color: 'var(--c-faint)', whiteSpace: 'nowrap' }}>🔕</span>
+                      <span title={t('notifications_push_unavailable')} style={{ fontSize: 10, color: 'var(--c-faint)', whiteSpace: 'nowrap' }}>🔕</span>
                     )}
                   </>
                 )}
 
                 <button onClick={() => { setEditingId(wc.id); setEditName(wc.name); setEditDraft({ ...DEFAULT_FILTERS, ...wc.filters }) }}
-                  title={t('watchcats_edit')} style={{ height: 32, padding: '0 10px', borderRadius: 7, border: '1px solid var(--c-border)', background: 'transparent', color: 'var(--c-muted)', cursor: 'pointer', fontSize: 12 }}>✏️</button>
-                <button onClick={() => remove(wc.id)} title={t('watchcats_delete')} style={{ height: 32, padding: '0 10px', borderRadius: 7, border: '1px solid var(--c-border)', background: 'transparent', color: 'var(--c-muted)', cursor: 'pointer', fontSize: 12 }}>🗑</button>
+                  title={t('notifications_edit')} style={{ height: 32, padding: '0 10px', borderRadius: 3, border: '1px solid var(--c-border)', background: 'transparent', color: 'var(--c-muted)', cursor: 'pointer', fontSize: 12 }}>✏️</button>
+                <button onClick={() => remove(wc.id)} title={t('notifications_delete')} style={{ height: 32, padding: '0 10px', borderRadius: 3, border: '1px solid var(--c-border)', background: 'transparent', color: 'var(--c-muted)', cursor: 'pointer', fontSize: 12 }}>🗑</button>
               </div>
             </div>
 
@@ -378,29 +379,29 @@ export function WatchCatPage({ user, currentFilters, openComposer, onComposerCon
               <div style={{ marginBottom: 8 }}>
                 {pushCapable ? (
                   <button onClick={() => toggleCatPush(wc)} disabled={pushBusy}
-                    role="switch" aria-checked={wc.push_enabled && devicePushOn} aria-label={t('watchcats_push_label')}
+                    role="switch" aria-checked={wc.push_enabled && devicePushOn} aria-label={t('notifications_push_label')}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 8, height: 38, padding: '0 6px 0 14px', width: '100%',
-                      borderRadius: 10, cursor: pushBusy ? 'wait' : 'pointer',
+                      borderRadius: 4, cursor: pushBusy ? 'wait' : 'pointer',
                       border: '1px solid var(--c-border)', background: 'var(--c-bg)',
                       opacity: pushBusy ? 0.6 : 1, justifyContent: 'space-between',
                     }}>
                     <span style={{ fontSize: 13, color: 'var(--c-text)', whiteSpace: 'nowrap' }}>
-                      {t('watchcats_push_label')}
+                      {t('notifications_push_label')}
                     </span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ fontSize: 13, color: 'var(--c-muted)', whiteSpace: 'nowrap' }}>
                         {wc.push_enabled && devicePushOn ? t('push_on') : t('push_off')}
                       </span>
-                      <span style={{ width: 34, height: 20, borderRadius: 999, position: 'relative', flexShrink: 0,
-                        background: wc.push_enabled && devicePushOn ? '#2563eb' : 'var(--c-border-md)', transition: 'background 0.15s' }}>
+                      <span style={{ width: 34, height: 20, borderRadius: 4, position: 'relative', flexShrink: 0,
+                        background: wc.push_enabled && devicePushOn ? 'var(--c-accent)' : 'var(--c-border-md)', transition: 'background 0.15s' }}>
                         <span style={{ width: 16, height: 16, borderRadius: '50%', background: '#fff', position: 'absolute', top: 2,
                           transition: 'left 0.15s', left: wc.push_enabled && devicePushOn ? 16 : 2, boxShadow: '0 1px 2px rgba(0,0,0,0.25)' }} />
                       </span>
                     </span>
                   </button>
                 ) : (
-                  <span title={t('watchcats_push_unavailable')} style={{ fontSize: 10, color: 'var(--c-faint)', whiteSpace: 'nowrap' }}>🔕 {t('watchcats_push_unavailable')}</span>
+                  <span title={t('notifications_push_unavailable')} style={{ fontSize: 10, color: 'var(--c-faint)', whiteSpace: 'nowrap' }}>🔕 {t('notifications_push_unavailable')}</span>
                 )}
               </div>
             )}
@@ -408,7 +409,7 @@ export function WatchCatPage({ user, currentFilters, openComposer, onComposerCon
             {/* Transient feedback for push toggle / mark-as-read actions */}
             {cardFeedback?.id === wc.id && (
               <div style={{
-                marginBottom: 8, padding: '7px 10px', borderRadius: 8, fontSize: 13,
+                marginBottom: 8, padding: '7px 10px', borderRadius: 3, fontSize: 13,
                 background: cardFeedback.kind === 'ok' ? 'rgba(22,163,74,0.12)' : 'rgba(220,38,38,0.10)',
                 color: cardFeedback.kind === 'ok' ? 'var(--c-green, #15803d)' : 'var(--c-red, #b91c1c)',
               }}>
@@ -417,33 +418,33 @@ export function WatchCatPage({ user, currentFilters, openComposer, onComposerCon
             )}
 
             {isEditing ? (
-              <div style={{ border: '1px solid var(--c-accent, #2563eb)', borderRadius: 10, padding: 10 }}>
+              <div style={{ border: '1px solid var(--c-accent)', borderRadius: 4, padding: 10 }}>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
                   <input autoFocus value={editName} onChange={e => setEditName(e.target.value)}
-                    placeholder={t('watchcats_name_placeholder')}
-                    style={{ flex: 1, padding: '7px 10px', borderRadius: 8, border: '1px solid var(--c-border)', background: 'var(--c-bg)', color: 'var(--c-text)', fontSize: 13 }} />
+                    placeholder={t('notifications_name_placeholder')}
+                    style={{ flex: 1, padding: '7px 10px', borderRadius: 3, border: '1px solid var(--c-border)', background: 'var(--c-bg)', color: 'var(--c-text)', fontSize: 13 }} />
                 </div>
                 <FilterPanel filters={editDraft} onChange={setEditDraft} resultCount={editCount} loading={loading} isMobile={false} requiredMaxPrice={!isAdmin} requiresMin={requiresMinPrice(editDraft, isAdmin ?? false)} minPrice={editDraft.minPrice} />
                 <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 10 }}>
                   <button onClick={saveEdit} disabled={saving || !editName.trim() || (!isAdmin && (!editDraft.maxPrice || requiresMinPrice(editDraft, false)))}
-                    style={{ padding: '9px 16px', borderRadius: 8, border: 'none', background: 'var(--c-accent, #2563eb)', color: '#fff', fontSize: 13, cursor: 'pointer', opacity: (saving || !editName.trim() || (!isAdmin && (!editDraft.maxPrice || requiresMinPrice(editDraft, false)))) ? 0.6 : 1 }}>
-                    {t('watchcats_save')}
+                    style={{ padding: '9px 16px', borderRadius: 3, border: 'none', background: 'var(--c-action)', boxShadow: '0 2px 0 var(--c-action-step)', color: '#fff', fontSize: 13, cursor: 'pointer', opacity: (saving || !editName.trim() || (!isAdmin && (!editDraft.maxPrice || requiresMinPrice(editDraft, false)))) ? 0.6 : 1 }}>
+                    {t('notifications_save')}
                   </button>
                   <button onClick={() => setEditingId(null)}
-                    style={{ padding: '9px 16px', borderRadius: 8, border: '1px solid var(--c-border)', background: 'transparent', color: 'var(--c-text)', fontSize: 13, cursor: 'pointer' }}>
-                    {t('watchcats_cancel')}
+                    style={{ padding: '9px 16px', borderRadius: 3, border: '1px solid var(--c-border)', background: 'transparent', color: 'var(--c-text)', fontSize: 13, cursor: 'pointer' }}>
+                    {t('notifications_cancel')}
                   </button>
                 </div>
               </div>
             ) : (
               <>
                 {m.length === 0 ? (
-                  <p style={{ color: 'var(--c-faint)', fontSize: 13, margin: '4px 0 10px' }}>{t('watchcats_empty_matches')}</p>
+                  <p style={{ color: 'var(--c-faint)', fontSize: 13, margin: '4px 0 10px' }}>{t('notifications_empty_matches')}</p>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '4px 0 10px' }}>
                     {m.slice(0, PREVIEW_COUNT).map((l: any) => (
                       <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        {!seen.get(wc.id).has(l.id) && <span style={{ width: 8, height: 8, borderRadius: 999, background: '#16a34a', flexShrink: 0 }} />}
+                        {!seen.get(wc.id).has(l.id) && <span style={{ width: 8, height: 8, borderRadius: 4, background: '#16a34a', flexShrink: 0 }} />}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <ListingCard listing={l} onClick={() => onListingClick(l.id)} />
                         </div>
@@ -451,16 +452,16 @@ export function WatchCatPage({ user, currentFilters, openComposer, onComposerCon
                     ))}
                     {m.length > PREVIEW_COUNT && (
                       <button onClick={() => onApply({ ...DEFAULT_FILTERS, ...wc.filters })}
-                        style={{ alignSelf: 'center', padding: '6px 14px', borderRadius: 8, border: 'none', background: 'var(--c-accent, #2563eb)', color: '#fff', fontSize: 12, cursor: 'pointer' }}>
-                        {t('watchcats_see_all')}
+                        style={{ alignSelf: 'center', padding: '6px 14px', borderRadius: 3, border: 'none', background: 'var(--c-action)', boxShadow: '0 2px 0 var(--c-action-step)', color: '#fff', fontSize: 12, cursor: 'pointer' }}>
+                        {t('notifications_see_all')}
                       </button>
                     )}
                   </div>
                 )}
 
                 <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                  <button onClick={() => markAllSeen(wc)} style={{ padding: '5px 12px', borderRadius: 7, border: '1px solid var(--c-border)', background: 'transparent', color: 'var(--c-muted)', fontSize: 12, cursor: 'pointer' }}>
-                    {t('watchcats_mark_read')}
+                  <button onClick={() => markAllSeen(wc)} style={{ padding: '5px 12px', borderRadius: 3, border: '1px solid var(--c-border)', background: 'transparent', color: 'var(--c-muted)', fontSize: 12, cursor: 'pointer' }}>
+                    {t('notifications_mark_read')}
                   </button>
                 </div>
               </>
@@ -470,34 +471,34 @@ export function WatchCatPage({ user, currentFilters, openComposer, onComposerCon
       })}
 
       {showCreate && (
-        <div style={{ border: '1px solid var(--c-accent, #2563eb)', borderRadius: 14, padding: 12, marginBottom: 12, background: 'var(--c-surface)' }}>
+        <div style={{ border: '1px solid var(--c-accent)', borderRadius: 6, padding: 12, marginBottom: 12, background: 'var(--c-surface)' }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
             <input autoFocus value={draftName} onChange={e => setDraftName(e.target.value)}
-              placeholder={t('watchcats_name_placeholder')}
-              style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--c-border)', background: 'var(--c-bg)', color: 'var(--c-text)', fontSize: 13 }} />
+              placeholder={t('notifications_name_placeholder')}
+              style={{ flex: 1, padding: '8px 10px', borderRadius: 3, border: '1px solid var(--c-border)', background: 'var(--c-bg)', color: 'var(--c-text)', fontSize: 13 }} />
           </div>
           <FilterPanel filters={draft} onChange={setDraft} resultCount={draftCount} loading={loading} isMobile={false} requiredMaxPrice={!isAdmin} requiresMin={requiresMinPrice(draft, isAdmin ?? false)} minPrice={draft.minPrice} />
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 10 }}>
             <button onClick={() => createFromCurrent()} disabled={saving || !draftName.trim() || (!isAdmin && (!draft.maxPrice || requiresMinPrice(draft, false)))}
-              style={{ padding: '9px 16px', borderRadius: 8, border: 'none', background: 'var(--c-accent, #2563eb)', color: '#fff', fontSize: 13, cursor: 'pointer', opacity: (saving || !draftName.trim() || (!isAdmin && (!draft.maxPrice || requiresMinPrice(draft, false)))) ? 0.6 : 1 }}>
-              {t('watchcats_save')}
+              style={{ padding: '9px 16px', borderRadius: 3, border: 'none', background: 'var(--c-action)', boxShadow: '0 2px 0 var(--c-action-step)', color: '#fff', fontSize: 13, cursor: 'pointer', opacity: (saving || !draftName.trim() || (!isAdmin && (!draft.maxPrice || requiresMinPrice(draft, false)))) ? 0.6 : 1 }}>
+              {t('notifications_save')}
             </button>
             <button onClick={() => { setShowCreate(false); setDraft(DEFAULT_FILTERS); setDraftName('') }}
-              style={{ padding: '9px 16px', borderRadius: 8, border: '1px solid var(--c-border)', background: 'transparent', color: 'var(--c-text)', fontSize: 13, cursor: 'pointer' }}>
-              {t('watchcats_cancel')}
+              style={{ padding: '9px 16px', borderRadius: 3, border: '1px solid var(--c-border)', background: 'transparent', color: 'var(--c-text)', fontSize: 13, cursor: 'pointer' }}>
+              {t('notifications_cancel')}
             </button>
           </div>
         </div>
       )}
 
-      {cats.length > 0 && cats.length < MAX_WATCHCATS && (
+      {cats.length > 0 && cats.length < MAX_NOTIFICATIONS && (
         <button onClick={() => { setShowCreate(true); setDraft(currentFilters) }}
           style={{
-            padding: '9px 14px', borderRadius: 10, fontSize: 13, cursor: 'pointer',
+            padding: '9px 14px', borderRadius: 4, fontSize: 13, cursor: 'pointer',
             border: '1px dashed var(--c-border)', background: 'transparent', color: 'var(--c-text)',
             marginTop: 4,
           }}>
-          {t('watchcats_new')}
+          {t('notifications_new')}
         </button>
       )}
     </div>

@@ -22,15 +22,17 @@ const STATUS_LABELS: Record<ListingStatus, string> = {
   rented: '_mylistings_status_rented',
   rejected: '_mylistings_status_rejected',
   deleted: '_mylistings_status_deleted',
+  expired: '_mylistings_status_expired',
 }
 
 const STATUS_COLORS: Record<ListingStatus, string> = {
   draft: '#94a3b8',
   pending_review: '#d97706',
   published: '#16a34a',
-  rented: '#2563eb',
-  rejected: '#dc2626',
+  rented: '#13408a',
+  rejected: '#b91c1c',
   deleted: '#64748b',
+  expired: '#8a5a00',
 }
 
 export function MyListingsPage({ user, onBack, onEdit, onRelist }: Props) {
@@ -58,8 +60,23 @@ export function MyListingsPage({ user, onBack, onEdit, onRelist }: Props) {
   const handleDelete = async (id: string) => {
     if (!confirm(t('_mylistings_confirm_delete'))) return
     setBusyId(id)
-    const { error } = await (supabase.from('listings') as any).update({ status: 'deleted' }).eq('id', id)
+    // Manual delete is final: remove the photos from the public bucket too (right to erasure).
+    // Paths are read from the DB and limited to the caller's own folder (storage RLS enforces it as well).
+    const { data: row } = await (supabase.from('listings') as any).select('image_paths').eq('id', id).eq('owner_id', user!.id).maybeSingle()
+    const mine = ((row?.image_paths ?? []) as string[]).filter(p => p.startsWith(user!.id + '/'))
+    // A relisted listing reuses the original's photo paths. Keep any file another of my live listings still points at.
+    let own = mine
+    if (mine.length > 0) {
+      const { data: others } = await (supabase.from('listings') as any)
+        .select('image_paths').eq('owner_id', user!.id).neq('id', id).neq('status', 'deleted')
+      const inUse = new Set<string>(((others ?? []) as { image_paths: string[] | null }[]).flatMap(o => o.image_paths ?? []))
+      own = mine.filter(p => !inUse.has(p))
+    }
+    const { error } = await (supabase.from('listings') as any).update({ status: 'deleted', image_paths: [] }).eq('id', id)
     if (error) { alert(mapError(error, t)); setBusyId(null); return }
+    if (own.length > 0) supabase.storage.from('listing-images').remove(own).catch((e: unknown) => {
+      if (import.meta.env.DEV) console.error('[storage cleanup]', e)
+    })
     // Fire-and-forget: notify owner
     supabase.functions.invoke('send-listing-email', {
       method: 'POST',
@@ -69,6 +86,22 @@ export function MyListingsPage({ user, onBack, onEdit, onRelist }: Props) {
     })
     setBusyId(null)
     load()
+  }
+
+  // Renewal goes through a database function (owner check + status rules), because plain users cannot write expires_at.
+  const handleRenew = async (id: string) => {
+    setBusyId(id)
+    const { error } = await (supabase.rpc as any)('renew_listing', { p_listing_id: id })
+    if (error) { alert(mapError(error, t)); setBusyId(null); return }
+    setBusyId(null)
+    load()
+  }
+
+  const daysLeft = (l: Listing) => l.expires_at ? Math.ceil((new Date(l.expires_at).getTime() - Date.now()) / 86_400_000) : null
+  const canRenew = (l: Listing) => {
+    if (l.status === 'expired') return true
+    const d = l.status === 'published' ? daysLeft(l) : null
+    return d !== null && d <= 7
   }
 
   const handleMarkRented = async (id: string) => {
@@ -83,7 +116,7 @@ export function MyListingsPage({ user, onBack, onEdit, onRelist }: Props) {
 
   return (
     <div style={{ maxWidth: 720, margin: window.innerWidth < 768 ? '16px auto' : '32px auto', padding: 16 }}>
-      <button onClick={onBack} style={{ marginBottom: 16, padding: '10px 16px', border: '1px solid var(--c-border)', borderRadius: 8, background: 'var(--c-surface)', cursor: 'pointer', fontSize: 13, minHeight: 40 }}>
+      <button onClick={onBack} style={{ marginBottom: 16, padding: '10px 16px', border: '1px solid var(--c-border)', borderRadius: 3, background: 'var(--c-surface)', cursor: 'pointer', fontSize: 13, minHeight: 40 }}>
         {t('_mylistings_back')}
       </button>
 
@@ -99,12 +132,12 @@ export function MyListingsPage({ user, onBack, onEdit, onRelist }: Props) {
         {listings.map(l => (
           <div key={l.id} style={{
             display: 'flex', gap: 12, padding: 12, border: '1px solid var(--c-border)',
-            borderRadius: 10, background: 'var(--c-surface)', alignItems: 'center',
+            borderRadius: 4, background: 'var(--c-surface)', alignItems: 'center',
           }}>
             <img
               src={l.image_paths?.[0] ? getImageUrl(l.image_paths[0]) : undefined}
               onError={e => { (e.target as HTMLImageElement).style.visibility = 'hidden' }}
-              style={{ width: 72, height: 60, objectFit: 'cover', borderRadius: 8, background: 'var(--c-bg)', flexShrink: 0 }}
+              style={{ width: 72, height: 60, objectFit: 'cover', borderRadius: 3, background: 'var(--c-bg)', flexShrink: 0 }}
             />
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.title}</p>
@@ -113,10 +146,18 @@ export function MyListingsPage({ user, onBack, onEdit, onRelist }: Props) {
               </p>
               <span style={{
                 display: 'inline-block', marginTop: 4, fontSize: 11, fontWeight: 600,
-                color: 'white', background: STATUS_COLORS[l.status], padding: '2px 8px', borderRadius: 6,
+                color: 'white', background: STATUS_COLORS[l.status], padding: '2px 8px', borderRadius: 3,
               }}>
                 {t(STATUS_LABELS[l.status])}
               </span>
+              {l.status === 'published' && daysLeft(l) !== null && (
+                <p style={{ fontSize: 11, color: (daysLeft(l) as number) <= 7 ? 'var(--c-red-ink)' : 'var(--c-muted)', marginTop: 4, fontWeight: (daysLeft(l) as number) <= 7 ? 600 : 400 }}>
+                  {(daysLeft(l) as number) > 0 ? `${t('_mylistings_expires_in')} ${daysLeft(l)} ${t('_mylistings_days')}` : t('_mylistings_expires_today')}
+                </p>
+              )}
+              {l.status === 'expired' && (
+                <p style={{ fontSize: 11, color: 'var(--c-muted)', marginTop: 4 }}>{t('_mylistings_expired_hint')}</p>
+              )}
               {l.status === 'rejected' && (l as any).rejection_reason && (
                 <p style={{ fontSize: 11, color: 'var(--c-red)', marginTop: 4 }}>
                   {t('_mylistings_rejection_reason')} {(l as any).rejection_reason}
@@ -124,27 +165,33 @@ export function MyListingsPage({ user, onBack, onEdit, onRelist }: Props) {
               )}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
-              {(l.status === 'draft' || l.status === 'published' || l.status === 'rejected') && (
-                <button onClick={() => onEdit(l)} style={{ padding: '8px 14px', fontSize: 12, border: '1px solid var(--c-border)', borderRadius: 7, background: 'var(--c-surface)', cursor: 'pointer', minHeight: 34 }}>
+              {(l.status === 'draft' || l.status === 'published' || l.status === 'rejected' || l.status === 'expired') && (
+                <button onClick={() => onEdit(l)} style={{ padding: '8px 14px', fontSize: 12, border: '1px solid var(--c-border)', borderRadius: 3, background: 'var(--c-surface)', cursor: 'pointer', minHeight: 34 }}>
                   {t('_mylistings_edit')}
                 </button>
               )}
+              {canRenew(l) && (
+                <button className="btn-action" onClick={() => handleRenew(l.id)} disabled={busyId === l.id}
+                  style={{ padding: '8px 14px', fontSize: 12, minHeight: 36 }}>
+                  {t('_mylistings_renew')}
+                </button>
+              )}
               {l.status === 'published' && (
-                <button onClick={() => handleMarkRented(l.id)} disabled={busyId === l.id} style={{ padding: '8px 14px', fontSize: 12, border: 'none', borderRadius: 7, background: 'var(--c-accent)', color: 'white', cursor: 'pointer', minHeight: 34 }}>
+                <button onClick={() => handleMarkRented(l.id)} disabled={busyId === l.id} style={{ padding: '8px 14px', fontSize: 12, border: 'none', borderRadius: 3, background: 'var(--c-action)', boxShadow: '0 2px 0 var(--c-action-step)', color: 'white', cursor: 'pointer', minHeight: 34 }}>
                   {t('_mylistings_mark_rented')}
                 </button>
               )}
               {l.status === 'rented' && onRelist && (
-                <button onClick={() => onRelist(l)} style={{ padding: '8px 14px', fontSize: 12, border: '1px solid var(--c-border)', borderRadius: 7, background: 'var(--c-surface)', color: 'var(--c-text)', cursor: 'pointer', minHeight: 34 }}>
+                <button onClick={() => onRelist(l)} style={{ padding: '8px 14px', fontSize: 12, border: '1px solid var(--c-border)', borderRadius: 3, background: 'var(--c-surface)', color: 'var(--c-text)', cursor: 'pointer', minHeight: 34 }}>
                   {t('_mylistings_relist')}
                 </button>
               )}
               {(l.status === 'draft' || l.status === 'published' || l.status === 'rejected' || l.status === 'rented') && (
-                <button onClick={() => setContractFor(l)} style={{ padding: '8px 14px', fontSize: 12, border: '1px solid var(--c-border)', borderRadius: 7, background: 'var(--c-surface)', color: 'var(--c-text)', cursor: 'pointer', minHeight: 34 }}>
+                <button onClick={() => setContractFor(l)} style={{ padding: '8px 14px', fontSize: 12, border: '1px solid var(--c-border)', borderRadius: 3, background: 'var(--c-surface)', color: 'var(--c-text)', cursor: 'pointer', minHeight: 34 }}>
                   {t('_mylistings_contract')}
                 </button>
               )}
-              <button onClick={() => handleDelete(l.id)} disabled={busyId === l.id} style={{ padding: '8px 14px', fontSize: 12, border: 'none', borderRadius: 7, background: 'color-mix(in srgb, var(--c-red) 15%, transparent)', color: 'var(--c-red)', cursor: 'pointer', minHeight: 34 }}>
+              <button onClick={() => handleDelete(l.id)} disabled={busyId === l.id} style={{ padding: '8px 14px', fontSize: 12, border: 'none', borderRadius: 3, background: 'color-mix(in srgb, var(--c-red) 15%, transparent)', color: 'var(--c-red)', cursor: 'pointer', minHeight: 34 }}>
                 {t('_mylistings_delete')}
               </button>
             </div>

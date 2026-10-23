@@ -53,6 +53,14 @@ export function mapError(e: unknown, t: TFunction, contextKey?: string): string 
   if (msg.includes('violates not-null')) return t('_error_save_generic')
   if (msg.includes('violates unique')) return t('_error_save_generic')
 
+  if (msg.includes('renew_not_allowed: too early')) return t('_error_renew_too_early')
+  if (msg.includes('renew_not_allowed: edited since expiry')) return t('_error_renew_edited')
+  if (msg.includes('renew_not_allowed')) return t('_error_renew_denied')
+  if (msg.includes('listing_limit')) return t('_error_listing_limit')
+  if (msg.includes('too_many_images')) return t('_error_too_many_images')
+  if (msg.includes('exceeded the maximum allowed size') || msg.includes('Payload too large')) return t('_create_photos_too_large')
+  if (msg.includes('mime type') && msg.includes('not supported')) return t('_error_image_type')
+
   // ── 3. Supabase Auth errors ──
   if (msg.includes('Invalid login credentials') || msg.includes('Email not confirmed')) return t('_error_auth_invalid')
   if (msg.includes('already been registered') || msg.includes('already exists') || msg.includes('User already registered')) return t('_error_auth_email_taken')

@@ -4,6 +4,8 @@ import { Wordmark } from '../components/Wordmark'
 import { useLang } from '../lib/lang'
 import { mapError } from '../lib/errors'
 import { TurnstileWidget } from '../components/TurnstileWidget'
+import { TERMS_VERSION, CONSENT_LS_KEY, consentPayload } from '../lib/consent'
+
 
 const SITE_KEY_ACTIVE = Boolean(import.meta.env.VITE_TURNSTILE_SITE_KEY)
 
@@ -11,7 +13,7 @@ type Mode = 'login' | 'register' | 'reset'
 
 const inp: React.CSSProperties = {
   width: '100%', padding: '12px', border: '1px solid var(--c-border)',
-  borderRadius: 8, fontSize: 16, color: 'var(--c-text)', background: 'var(--c-surface)', outline: 'none',
+  borderRadius: 3, fontSize: 16, color: 'var(--c-text)', background: 'var(--c-surface)', outline: 'none',
 }
 
 interface Props {
@@ -26,6 +28,7 @@ export function AuthPage({ onBack }: Props) {
   const [displayName, setDisplayName] = useState('')
   const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(false)
+  const [agreed, setAgreed] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [newPassword, setNewPassword] = useState('')
   const [recoveryMode, setRecoveryMode] = useState(false)
@@ -50,6 +53,7 @@ export function AuthPage({ onBack }: Props) {
     // Only block on captcha when the site key is actually provisioned. If the
     // widget never produced a token (script blocked / throttled / offline), let
     // the request through so auth isn't bricked on a flaky network.
+    if (mode === 'register' && !agreed) { setMsg({ ok: false, text: t('_auth_consent_required') }); return }
     if (SITE_KEY_ACTIVE && !captchaToken) { setMsg({ ok: false, text: t('_captcha_pending') }); return }
     setCaptchaReady(false) // the token below is single-use; re-roll for a retry
     setCaptchaEpoch(e => e + 1)
@@ -59,12 +63,12 @@ export function AuthPage({ onBack }: Props) {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { display_name: displayName, phone }, captchaToken },
+        options: { data: { display_name: displayName, phone, terms_accepted_at: new Date().toISOString(), terms_version: TERMS_VERSION }, captchaToken },
       })
       if (error) { setMsg({ ok: false, text: mapError(error, t) }); setLoading(false); return }
       if (data?.user) {
         await supabase.from('profiles').upsert(
-          [{ id: data.user.id, display_name: displayName, phone, email }] as any,
+          [{ id: data.user.id, display_name: displayName, phone, email, terms_accepted_at: new Date().toISOString(), terms_version: TERMS_VERSION }] as any,
           { onConflict: 'id', ignoreDuplicates: false }
         )
         setMsg({ ok: true, text: t('_auth_register_success') })
@@ -109,10 +113,20 @@ export function AuthPage({ onBack }: Props) {
     }, 1200)
   }
 
-  const handleGoogle = () => supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: { redirectTo: window.location.origin },
-  })
+  // Google never blocks on the checkbox: one button covers login and signup. If the box was ticked on
+  // the register tab we stash it so App.tsx records it after the redirect; otherwise the one-time
+  // ConsentGate asks for it after the first Google sign-in.
+  const handleGoogle = () => {
+    if (mode === 'register' && agreed) {
+      try { localStorage.setItem(CONSENT_LS_KEY, JSON.stringify(consentPayload())) } catch { /* private mode */ }
+    }
+    return supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin },
+    })
+  }
+
+  const canSubmit = (!SITE_KEY_ACTIVE || captchaReady) && (mode !== 'register' || agreed)
 
   if (recoveryMode) {
     return (
@@ -120,7 +134,7 @@ export function AuthPage({ onBack }: Props) {
         <div onClick={onBack} style={{ cursor: 'pointer', marginBottom: 24 }}>
           <Wordmark />
         </div>
-        <div style={{ width: '100%', maxWidth: 380, background: 'var(--c-surface)', borderRadius: 12, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+        <div style={{ width: '100%', maxWidth: 380, background: 'var(--c-surface)', borderRadius: 5, padding: 24, boxShadow: '4px 4px 0 var(--c-border-md)' }}>
           <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>{t('_auth_reset_title')}</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <input style={inp} placeholder={t('_auth_newpassword_placeholder')} type="password" value={newPassword}
@@ -128,7 +142,7 @@ export function AuthPage({ onBack }: Props) {
               onKeyDown={e => e.key === 'Enter' && handleUpdatePassword()} />
             {msg && <div style={{ fontSize: 12, color: msg.ok ? 'var(--c-green)' : 'var(--c-red)' }}>{msg.text}</div>}
             <button onClick={handleUpdatePassword} disabled={loading || newPassword.length < 6}
-              style={{ padding: '13px 0', background: 'var(--c-accent)', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer', minHeight: 44, fontFamily: 'inherit' }}>
+              style={{ padding: '13px 0', background: 'var(--c-action)', boxShadow: '0 2px 0 var(--c-action-step)', color: 'white', border: 'none', borderRadius: 3, fontSize: 14, fontWeight: 600, cursor: 'pointer', minHeight: 44, fontFamily: 'inherit' }}>
               {loading ? '...' : t('_auth_submit_newpassword')}
             </button>
           </div>
@@ -144,7 +158,7 @@ export function AuthPage({ onBack }: Props) {
         style={{
           position: 'absolute', top: 16, left: 16, display: 'flex', alignItems: 'center', gap: 6,
           padding: '8px 14px', background: 'var(--c-surface)', border: '1px solid var(--c-border)',
-          borderRadius: 8, fontSize: 13, color: 'var(--c-text)', cursor: 'pointer',
+          borderRadius: 3, fontSize: 13, color: 'var(--c-text)', cursor: 'pointer',
         }}
       >
         {t('_auth_back')}
@@ -154,18 +168,18 @@ export function AuthPage({ onBack }: Props) {
         <Wordmark />
       </div>
 
-      <div style={{ width: '100%', maxWidth: 380, background: 'var(--c-surface)', borderRadius: 12, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+      <div style={{ width: '100%', maxWidth: 380, background: 'var(--c-surface)', borderRadius: 5, padding: 24, boxShadow: '4px 4px 0 var(--c-border-md)' }}>
         <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--c-muted)', marginBottom: 16 }}>{t('_auth_subtitle')}</p>
 
         {mode !== 'reset' && (
-          <div style={{ display: 'flex', background: 'var(--c-bg)', borderRadius: 8, padding: 3, marginBottom: 16 }}>
+          <div style={{ display: 'flex', background: 'var(--c-bg)', borderRadius: 3, padding: 3, marginBottom: 16 }}>
             {(['login', 'register'] as Mode[]).map(m => (
-              <button key={m} onClick={() => { setMode(m); setMsg(null) }} style={{
-                flex: 1, padding: '6px 0', borderRadius: 6, border: 'none',
+              <button key={m} onClick={() => { setMode(m); setMsg(null); setAgreed(false) }} style={{
+                flex: 1, padding: '6px 0', borderRadius: 3, border: 'none',
                 background: mode === m ? 'var(--c-surface)' : 'transparent',
                 color: mode === m ? 'var(--c-text)' : 'var(--c-muted)',
                 fontSize: 13, fontWeight: mode === m ? 500 : 400, cursor: 'pointer',
-                boxShadow: mode === m ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                boxShadow: mode === m ? '0 2px 0 var(--c-text)' : 'none',
               }}>{m === 'login' ? t('_auth_tab_login') : t('_auth_tab_register')}</button>
             ))}
           </div>
@@ -202,8 +216,8 @@ export function AuthPage({ onBack }: Props) {
           )}
 
           {loading ? <span style={{ textAlign: 'center', fontSize: 13, color: 'var(--c-muted)', minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>...</span> : (
-            <button onClick={handleSubmit} disabled={SITE_KEY_ACTIVE && !captchaReady}
-              style={{ padding: '13px 0', background: (!SITE_KEY_ACTIVE || captchaReady) ? 'var(--c-accent)' : 'var(--c-border-md)', color: (!SITE_KEY_ACTIVE || captchaReady) ? 'white' : 'var(--c-faint)', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: (!SITE_KEY_ACTIVE || captchaReady) ? 'pointer' : 'not-allowed', minHeight: 44 }}>
+            <button onClick={handleSubmit} disabled={(SITE_KEY_ACTIVE && !captchaReady) || (mode === 'register' && !agreed)}
+              style={{ padding: '13px 0', background: canSubmit ? 'var(--c-action)' : 'var(--c-border-md)', color: canSubmit ? 'white' : 'var(--c-faint)', border: 'none', borderRadius: 3, fontSize: 14, fontWeight: 600, cursor: canSubmit ? 'pointer' : 'not-allowed', minHeight: 44 }}>
               {mode === 'login' ? t('_auth_submit_login') : mode === 'register' ? t('_auth_submit_register') : t('_auth_submit_reset')}
             </button>
           )}
@@ -225,19 +239,23 @@ export function AuthPage({ onBack }: Props) {
 
           {mode !== 'reset' && (
             <>
-              {/* Informative consent text — no registration possible without agreeing */}
-              <p style={{ fontSize: 11, lineHeight: 1.55, color: 'var(--c-muted)', textAlign: 'center', margin: '2px 0 0' }}>
-                {t('_auth_consent_prefix')}{' '}
-                <a href={t('_auth_consent_terms_url')} target="_blank" rel="noopener noreferrer"
-                  style={{ color: 'var(--c-accent)', textDecoration: 'none' }}>{t('_auth_consent_terms')}</a>{' '}
-                {t('_auth_consent_and')}{' '}
-                <a href={t('_auth_consent_privacy_url')} target="_blank" rel="noopener noreferrer"
-                  style={{ color: 'var(--c-accent)', textDecoration: 'none' }}>{t('_auth_consent_privacy')}</a>.{' '}
-                {t('_auth_consent_suffix')}
-              </p>
+              {/* Explicit consent on registration; Google/login users are covered by the one-time ConsentGate */}
+              {mode === 'register' && <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, lineHeight: 1.5, color: 'var(--c-muted)', cursor: 'pointer', margin: '2px 0 0' }}>
+                <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)}
+                  style={{ marginTop: 2, width: 16, height: 16, flexShrink: 0, accentColor: 'var(--c-accent)', cursor: 'pointer' }} />
+                <span>
+                  {t('_auth_consent_prefix')}{' '}
+                  <a href={t('_auth_consent_terms_url')} target="_blank" rel="noopener noreferrer"
+                    style={{ color: 'var(--c-accent)', textDecoration: 'none' }}>{t('_auth_consent_terms')}</a>{' '}
+                  {t('_auth_consent_and')}{' '}
+                  <a href={t('_auth_consent_privacy_url')} target="_blank" rel="noopener noreferrer"
+                    style={{ color: 'var(--c-accent)', textDecoration: 'none' }}>{t('_auth_consent_privacy')}</a>,{' '}
+                  {t('_auth_consent_suffix')}
+                </span>
+              </label>}
 
               <div style={{ textAlign: 'center', fontSize: 11, color: 'var(--c-muted)' }}>{t('_auth_or')}</div>
-              <button onClick={handleGoogle} style={{ padding: '13px 0', background: 'var(--c-bg)', border: '1px solid var(--c-border)', borderRadius: 8, fontSize: 14, cursor: 'pointer', minHeight: 44 }}>
+              <button onClick={handleGoogle} style={{ cursor: 'pointer', padding: '13px 0', background: 'var(--c-bg)', border: '1px solid var(--c-border)', borderRadius: 3, fontSize: 14, minHeight: 44 }}>
                 {t('_auth_google')}
               </button>
             </>

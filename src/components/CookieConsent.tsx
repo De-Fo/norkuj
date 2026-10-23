@@ -74,9 +74,9 @@ export function CookieConsent() {
       margin: '0 auto',
       zIndex: 9999,
       background: 'var(--c-surface, #fff)',
-      border: '1px solid var(--c-border, #e2e8f0)',
-      borderRadius: 12,
-      boxShadow: '0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08)',
+      border: '2px solid var(--c-text)',
+      borderRadius: 3,
+      boxShadow: '4px 4px 0 var(--c-text)',
       padding: '16px 20px',
       display: 'flex',
       flexDirection: 'column',
@@ -95,7 +95,7 @@ export function CookieConsent() {
           <a href={cookieUrl}
             target="_blank"
             rel="noopener noreferrer"
-            style={{ color: 'var(--c-accent, #2563eb)', textDecoration: 'underline' }}>
+            style={{ color: 'var(--c-accent)', textDecoration: 'underline' }}>
             {t('_cookies_link')}
           </a>
         </span>
@@ -107,12 +107,14 @@ export function CookieConsent() {
             flex: 1,
             minWidth: 120,
             padding: '10px 0',
-            border: '1px solid var(--c-border, #e2e8f0)',
-            borderRadius: 8,
-            background: 'transparent',
-            color: 'var(--c-muted, #64748b)',
+            border: 'none',
+            borderRadius: 3,
+            // same size and weight as "Accept": rejecting must be as easy and visible as accepting
+            background: 'var(--c-text)',
+            color: 'var(--c-bg)',
+            boxShadow: '0 2px 0 var(--c-border-md)',
             fontSize: 13,
-            fontWeight: 500,
+            fontWeight: 700,
             cursor: 'pointer',
           }}>
           {t('_cookies_reject')}
@@ -123,11 +125,12 @@ export function CookieConsent() {
             minWidth: 120,
             padding: '10px 0',
             border: 'none',
-            borderRadius: 8,
-            background: 'var(--c-accent, #2563eb)',
+            borderRadius: 3,
+            background: 'var(--c-action)',
             color: '#fff',
+            boxShadow: '0 2px 0 var(--c-action-step)',
             fontSize: 13,
-            fontWeight: 600,
+            fontWeight: 700,
             cursor: 'pointer',
           }}>
           {t('_cookies_accept')}

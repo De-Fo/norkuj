@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import type { PropertyType, Listing } from '../lib/types'
 import { PROPERTY_TYPE_LABELS } from '../lib/types'
 import { DISTRICT_GROUPS, suggestDistricts, ALL_DISTRICTS, findDistrictsForPoint } from '../lib/districts'
-import maplibregl from 'maplibre-gl'
+import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useLang } from '../lib/lang'
 import { compressImage, convertHeicToJpeg, getImageUrl } from '../lib/utils'
@@ -43,12 +43,12 @@ const EMPTY: FormData = {
   lat: null, lng: null, images: [],
 }
 
-const PROPERTY_TYPES: PropertyType[] = ['pokoj','sdileny_pokoj','1+kk','1+1','2+kk','2+1','3+kk','3+1','4+kk','4+1','5+kk','5+1','6+kk','6+1','atypical']
+const PROPERTY_TYPES: PropertyType[] = ['pokoj', 'sdileny_pokoj', '1+kk', '1+1', '2+kk', '2+1', '3+kk', '3+1', '4+kk', '4+1', '5+kk', '5+1', '6+kk', '6+1', 'atypical']
 const DISTRICTS = ALL_DISTRICTS
 
 const inp: React.CSSProperties = {
   width: '100%', padding: '9px 11px', border: '1px solid var(--c-border)',
-  borderRadius: 8, fontSize: 13, color: 'var(--c-text)', background: 'var(--c-surface)', outline: 'none',
+  borderRadius: 3, fontSize: 13, color: 'var(--c-text)', background: 'var(--c-surface)', outline: 'none',
 }
 const label: React.CSSProperties = { fontSize: 12, fontWeight: 500, color: 'var(--c-muted)', marginBottom: 4, display: 'block' }
 
@@ -56,8 +56,8 @@ function Toggle({ checked, onChange, children }: { checked: boolean; onChange: (
   return (
     <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
       <div onClick={() => onChange(!checked)} style={{
-        width: 36, height: 20, borderRadius: 10,
-        background: checked ? '#2563eb' : 'var(--c-border-md)',
+        width: 36, height: 20, borderRadius: 4,
+        background: checked ? 'var(--c-accent)' : 'var(--c-border-md)',
         position: 'relative', transition: 'background 0.2s', flexShrink: 0,
       }}>
         <div style={{
@@ -154,7 +154,7 @@ export function CreateListingPage({ onDone, editListing, relistFrom }: Props) {
       zoom: 12,
     })
 
-    map.on('click', (e) => {
+    map.on('click', (e: maplibregl.MapMouseEvent) => {
       const { lng, lat } = e.lngLat
       set({ lat, lng })
       if (markerRef.current) markerRef.current.remove()
@@ -199,7 +199,7 @@ export function CreateListingPage({ onDone, editListing, relistFrom }: Props) {
         continue
       }
       // Convert HEIC to JPEG so it works in all browsers
-      const isHeic = /\.(heic|heif)$/i.test(file.name) || ['image/heic','image/heif','image/heic-sequence','image/heif-sequence'].includes(file.type)
+      const isHeic = /\.(heic|heif)$/i.test(file.name) || ['image/heic', 'image/heif', 'image/heic-sequence', 'image/heif-sequence'].includes(file.type)
       let readyFile = file
       if (isHeic) {
         setConvertingHeic(true)
@@ -213,12 +213,15 @@ export function CreateListingPage({ onDone, editListing, relistFrom }: Props) {
         }
         setConvertingHeic(false)
       }
+      let finalFile = readyFile
       try {
-        const compressed = await compressImage(readyFile)
-        validFiles.push(compressed)
+        finalFile = await compressImage(readyFile)
       } catch {
-        validFiles.push(readyFile) // fallback: use the (possibly converted) original
+        // fallback: use the (possibly converted) original
       }
+      // The storage bucket refuses anything over 2MB: tell the user now instead of at final submit.
+      if (finalFile.size > 2 * 1024 * 1024) { setError(t('_create_photos_too_large')); continue }
+      validFiles.push(finalFile)
     }
     set({ images: [...form.images, ...validFiles].slice(0, 20) })
   }
@@ -337,9 +340,9 @@ export function CreateListingPage({ onDone, editListing, relistFrom }: Props) {
         height: window.innerWidth < 768 ? '100%' : '80%',
         maxWidth: window.innerWidth < 768 ? undefined : 900,
         background: 'var(--c-surface)',
-        borderRadius: window.innerWidth < 768 ? 0 : 16,
+        borderRadius: window.innerWidth < 768 ? 0 : 6,
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
-        boxShadow: window.innerWidth < 768 ? 'none' : '0 20px 60px rgba(0,0,0,0.3)',
+        boxShadow: window.innerWidth < 768 ? 'none' : '6px 6px 0 var(--c-text)',
         position: 'relative',
       }}>
 
@@ -360,8 +363,8 @@ export function CreateListingPage({ onDone, editListing, relistFrom }: Props) {
               {isEdit ? t('_create_success_text_edit') : t('_create_success_text')}
             </p>
             <button onClick={onDone} style={{
-              marginTop: 8, padding: '10px 24px', background: 'var(--c-accent)', color: 'white',
-              border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer',
+              marginTop: 8, padding: '10px 24px', background: 'var(--c-action)', boxShadow: '0 2px 0 var(--c-action-step)', color: 'white',
+              border: 'none', borderRadius: 3, fontSize: 13, fontWeight: 500, cursor: 'pointer',
             }}>
               {t('_create_back_home')}
             </button>
@@ -374,11 +377,11 @@ export function CreateListingPage({ onDone, editListing, relistFrom }: Props) {
             </p>
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={() => setConfirmClose(false)} style={{
-                padding: '8px 16px', border: '1px solid var(--c-border)', borderRadius: 8,
+                padding: '8px 16px', border: '1px solid var(--c-border)', borderRadius: 3,
                 background: 'var(--c-surface)', fontSize: 13, cursor: 'pointer',
               }}>{t('_create_confirm_continue')}</button>
               <button onClick={onDone} style={{
-                padding: '8px 16px', border: 'none', borderRadius: 8,
+                padding: '8px 16px', border: 'none', borderRadius: 3,
                 background: 'var(--c-red)', color: 'white', fontSize: 13, fontWeight: 500, cursor: 'pointer',
               }}>{t('_create_confirm_discard')}</button>
             </div>
@@ -395,7 +398,7 @@ export function CreateListingPage({ onDone, editListing, relistFrom }: Props) {
                     <div style={{
                       width: 22, height: 22, borderRadius: '50%', display: 'flex',
                       alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 600,
-                      background: i < step ? 'color-mix(in srgb, var(--c-green) 20%, transparent)' : i === step ? '#2563eb' : 'var(--c-bg)',
+                      background: i < step ? 'color-mix(in srgb, var(--c-green) 20%, transparent)' : i === step ? 'var(--c-accent)' : 'var(--c-bg)',
                       color: i < step ? 'var(--c-green)' : i === step ? 'white' : 'var(--c-faint)',
                       border: i === step ? 'none' : '1px solid var(--c-border)', flexShrink: 0,
                     }}>{i < step ? '✓' : i + 1}</div>
@@ -428,10 +431,10 @@ export function CreateListingPage({ onDone, editListing, relistFrom }: Props) {
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                         {PROPERTY_TYPES.map(t => (
                           <button key={t} onClick={() => set({ property_type: t })} style={{
-                            padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 13,
+                            padding: '6px 12px', borderRadius: 3, cursor: 'pointer', fontSize: 13,
                             border: form.property_type === t ? 'none' : '1px solid var(--c-border)',
                             background: form.property_type === t ? 'var(--c-accent)' : 'var(--c-surface)',
-                            color: form.property_type === t ? 'white' : 'var(--c-text)',
+                            color: form.property_type === t ? 'var(--c-on-accent)' : 'var(--c-text)',
                           }}>{PROPERTY_TYPE_LABELS[t]}</button>
                         ))}
                       </div>
@@ -484,7 +487,7 @@ export function CreateListingPage({ onDone, editListing, relistFrom }: Props) {
                       <input style={inp} type="number" placeholder="12" value={form.min_lease_months} onChange={e => set({ min_lease_months: e.target.value })} />
                     </div>
                     {form.price_czk && (
-                      <div style={{ padding: '10px 12px', background: 'color-mix(in srgb, var(--c-accent) 10%, transparent)', borderRadius: 8, border: '1px solid color-mix(in srgb, var(--c-accent) 30%, transparent)' }}>
+                      <div style={{ padding: '10px 12px', background: 'color-mix(in srgb, var(--c-accent) 10%, transparent)', borderRadius: 3, border: '1px solid color-mix(in srgb, var(--c-accent) 30%, transparent)' }}>
                         <span style={{ fontSize: 12, color: 'var(--c-accent)' }}>
                           {t('_create_total')} <strong>{(parseInt(form.price_czk || '0') + parseInt(form.utilities_czk || '0')).toLocaleString('cs-CZ')} Kč/měs</strong>
                         </span>
@@ -526,7 +529,7 @@ export function CreateListingPage({ onDone, editListing, relistFrom }: Props) {
                               set({ address_districts: newDists })
                               setDistrictSuggestions([])
                             }} style={{
-                              padding: '2px 8px', borderRadius: 10, cursor: 'pointer',
+                              padding: '2px 8px', borderRadius: 4, cursor: 'pointer',
                               border: '1px solid var(--c-border)', background: 'var(--c-bg)',
                               color: 'var(--c-accent)', fontSize: 10, fontWeight: 500,
                             }}>
@@ -538,13 +541,13 @@ export function CreateListingPage({ onDone, editListing, relistFrom }: Props) {
                     </div>
                     <div>
                       <label style={label}>{t('_create_map_label')}</label>
-                      <div ref={mapContainerRef} style={{ height: 280, borderRadius: 10, overflow: 'hidden', border: '1px solid var(--c-border)' }} />
+                      <div ref={mapContainerRef} style={{ height: 280, borderRadius: 4, overflow: 'hidden', border: '1px solid var(--c-border)' }} />
                       {form.lat
                         ? <p style={{ fontSize: 11, color: 'var(--c-green)', marginTop: 6 }}>{t('_create_map_done')} ({form.lat.toFixed(5)}, {form.lng?.toFixed(5)})</p>
                         : <p style={{ fontSize: 11, color: 'var(--c-faint)', marginTop: 6 }}>{t('_create_map_hint')}</p>}
                     </div>
                     <div>
-                      <label style={label}>{t('_create_district_label')} <span style={{fontWeight:400,color:'var(--c-faint)'}}>{t('_create_district_hint')}</span></label>
+                      <label style={label}>{t('_create_district_label')} <span style={{ fontWeight: 400, color: 'var(--c-faint)' }}>{t('_create_district_hint')}</span></label>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                         {DISTRICTS.map(d => {
                           const active = form.address_districts.includes(d)
@@ -558,10 +561,10 @@ export function CreateListingPage({ onDone, editListing, relistFrom }: Props) {
                               }
                               set({ address_districts: newDists })
                             }} style={{
-                              padding: '4px 10px', borderRadius: 14, cursor: 'pointer',
+                              padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
                               border: active ? 'none' : '1px solid var(--c-border)',
-                              background: active ? '#2563eb' : 'var(--c-surface)',
-                              color: active ? '#fff' : 'var(--c-muted)',
+                              background: active ? 'var(--c-accent)' : 'var(--c-surface)',
+                              color: active ? 'var(--c-on-accent)' : 'var(--c-muted)',
                               fontSize: 11, fontWeight: 500, transition: 'all 0.12s',
                             }}>
                               {d}
@@ -583,7 +586,7 @@ export function CreateListingPage({ onDone, editListing, relistFrom }: Props) {
                       <label style={label}>{t('_create_photos_label')}</label>
                       <label style={{
                         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                        height: 120, border: '2px dashed var(--c-border)', borderRadius: 10,
+                        height: 120, border: '2px dashed var(--c-border)', borderRadius: 4,
                         cursor: 'pointer', color: 'var(--c-muted)', fontSize: 13, gap: 6,
                       }}>
                         <span style={{ fontSize: 28 }}>📷</span>
@@ -604,7 +607,7 @@ export function CreateListingPage({ onDone, editListing, relistFrom }: Props) {
                               return (
                                 <div key={path} style={{ position: 'relative' }}>
                                   <img src={getImageUrl(path)} alt={t('_create_photos_existing')}
-                                    style={{ width: '100%', height: 80, objectFit: 'cover', borderRadius: 8 }} />
+                                    style={{ width: '100%', height: 80, objectFit: 'cover', borderRadius: 3 }} />
                                   <button aria-label={t('_create_photos_remove')} onClick={() => {
                                     if ((srcListing?.image_paths ?? []).filter(p => !removedExistingPaths.has(p)).length <= 1) {
                                       const keep = confirm(t('_create_photos_last_confirm'))
@@ -630,7 +633,7 @@ export function CreateListingPage({ onDone, editListing, relistFrom }: Props) {
                           <button onClick={() => setRemovedExistingPaths(new Set())}
                             style={{
                               marginLeft: 8, padding: '1px 6px', border: '1px solid var(--c-border)',
-                              borderRadius: 6, background: 'transparent', color: 'var(--c-muted)',
+                              borderRadius: 3, background: 'transparent', color: 'var(--c-muted)',
                               fontSize: 10, cursor: 'pointer',
                             }}>
                             {t('_create_photos_undo_removed')}
@@ -641,8 +644,8 @@ export function CreateListingPage({ onDone, editListing, relistFrom }: Props) {
                       {/* Validation */}
                       {(() => {
                         const existingCount = srcListing
-                        ? (srcListing.image_paths ?? []).filter(p => !removedExistingPaths.has(p)).length
-                        : 0
+                          ? (srcListing.image_paths ?? []).filter(p => !removedExistingPaths.has(p)).length
+                          : 0
                         if (existingCount + form.images.length === 0) {
                           return <p style={{ fontSize: 11, color: 'var(--c-red)', marginTop: 4 }}>{t('_create_photos_required')}</p>
                         }
@@ -655,7 +658,7 @@ export function CreateListingPage({ onDone, editListing, relistFrom }: Props) {
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
                         {form.images.map((f, i) => (
                           <div key={i} style={{ position: 'relative' }}>
-                            <img src={URL.createObjectURL(f)} alt="" style={{ width: '100%', height: 80, objectFit: 'cover', borderRadius: 8 }} />
+                            <img src={URL.createObjectURL(f)} alt="" style={{ width: '100%', height: 80, objectFit: 'cover', borderRadius: 3 }} />
                             <button aria-label={t('_create_photos_remove')} onClick={() => set({ images: form.images.filter((_, j) => j !== i) })} style={{
                               position: 'absolute', top: 3, right: 3, width: 18, height: 18,
                               borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.6)',
@@ -672,12 +675,12 @@ export function CreateListingPage({ onDone, editListing, relistFrom }: Props) {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                     <h3 style={{ fontSize: 15, fontWeight: 600 }}>{t('_create_review_title')}</h3>
                     {isEdit && !isRelist && (
-                      <div style={{ padding: '10px 12px', background: 'var(--c-bg)', border: '1px solid var(--c-yellow)', borderRadius: 8, fontSize: 12, color: 'var(--c-muted)' }}>
+                      <div style={{ padding: '10px 12px', background: 'var(--c-bg)', border: '1px solid var(--c-yellow)', borderRadius: 3, fontSize: 12, color: 'var(--c-muted)' }}>
                         {t('_create_edit_warning')}
                       </div>
                     )}
                     {isRelist && (
-                      <div style={{ padding: '10px 12px', background: 'color-mix(in srgb, var(--c-accent) 8%, transparent)', border: '1px solid var(--c-accent)', borderRadius: 8, fontSize: 12, color: 'var(--c-muted)' }}>
+                      <div style={{ padding: '10px 12px', background: 'color-mix(in srgb, var(--c-accent) 8%, transparent)', border: '1px solid var(--c-accent)', borderRadius: 3, fontSize: 12, color: 'var(--c-muted)' }}>
                         {t('_create_relist_warning')}
                       </div>
                     )}
@@ -685,8 +688,8 @@ export function CreateListingPage({ onDone, editListing, relistFrom }: Props) {
                       [t('_create_review_name'), form.title],
                       [t('_create_review_type'), PROPERTY_TYPE_LABELS[form.property_type as PropertyType] ?? '—'],
                       [t('_create_review_area'), `${form.area_sqm} m²`],
-                      [t('_create_review_price'), `${parseInt(form.price_czk||'0').toLocaleString('cs-CZ')} Kč/měs`],
-                      [t('_create_review_utilities'), `${parseInt(form.utilities_czk||'0').toLocaleString('cs-CZ')} Kč/měs`],
+                      [t('_create_review_price'), `${parseInt(form.price_czk || '0').toLocaleString('cs-CZ')} Kč/měs`],
+                      [t('_create_review_utilities'), `${parseInt(form.utilities_czk || '0').toLocaleString('cs-CZ')} Kč/měs`],
                       [t('_create_review_address'), `${form.address_street}, ${form.address_districts.join(', ')}`],
                       [t('_create_review_location'), form.lat ? t('_create_review_ok') : t('_create_review_missing')],
                       [t('_create_review_photos'), `${form.images.length} ${t('_create_review_photos')}`],
@@ -697,7 +700,7 @@ export function CreateListingPage({ onDone, editListing, relistFrom }: Props) {
                       </div>
                     ))}
                     {error && (
-                      <div style={{ padding: '10px 12px', background: 'color-mix(in srgb, var(--c-red) 12%, transparent)', borderRadius: 8, color: 'var(--c-red)', fontSize: 12 }}>
+                      <div style={{ padding: '10px 12px', background: 'color-mix(in srgb, var(--c-red) 12%, transparent)', borderRadius: 3, color: 'var(--c-red)', fontSize: 12 }}>
                         {error}
                       </div>
                     )}
@@ -711,24 +714,24 @@ export function CreateListingPage({ onDone, editListing, relistFrom }: Props) {
               background: 'var(--c-surface)', display: 'flex', justifyContent: 'space-between', flexShrink: 0,
             }}>
               <button onClick={step === 0 ? requestClose : () => setStep(s => s - 1)} style={{
-                padding: '9px 18px', border: '1px solid var(--c-border)', borderRadius: 8,
+                padding: '9px 18px', border: '1px solid var(--c-border)', borderRadius: 3,
                 background: 'var(--c-surface)', color: 'var(--c-text)', fontSize: 13, cursor: 'pointer',
               }}>
                 {step === 0 ? t('_create_nav_cancel') : t('_create_nav_back')}
               </button>
               {step < 4
                 ? <button onClick={() => stepValid(step) ? setStep(s => s + 1) : undefined} style={{
-                    padding: '9px 18px', border: 'none', borderRadius: 8,
-                    background: stepValid(step) ? 'var(--c-accent)' : 'var(--c-border-md)',
-                    color: stepValid(step) ? 'white' : 'var(--c-faint)',
-                    fontSize: 13, fontWeight: 500, cursor: stepValid(step) ? 'pointer' : 'not-allowed',
-                  }}>{t('_create_nav_next')}</button>
+                  padding: '9px 18px', border: 'none', borderRadius: 3,
+                  background: stepValid(step) ? 'var(--c-action)' : 'var(--c-border-md)',
+                  color: stepValid(step) ? 'white' : 'var(--c-faint)',
+                  fontSize: 13, fontWeight: 500, cursor: stepValid(step) ? 'pointer' : 'not-allowed',
+                }}>{t('_create_nav_next')}</button>
                 : <button onClick={allValid && !uploading ? handleSubmit : undefined} disabled={uploading || !allValid} style={{
-                    padding: '9px 18px', border: 'none', borderRadius: 8,
-                    background: uploading ? 'var(--c-border-md)' : allValid ? 'var(--c-green)' : 'var(--c-border-md)',
-                    color: allValid && !uploading ? 'white' : 'var(--c-faint)',
-                    fontSize: 13, fontWeight: 500, cursor: uploading || !allValid ? 'not-allowed' : 'pointer',
-                  }}>{uploading ? t('_create_submitting') : isEdit ? t('_create_submit_edit') : isRelist ? t('_create_submit_relist') : t('_create_submit')}
+                  padding: '9px 18px', border: 'none', borderRadius: 3,
+                  background: uploading ? 'var(--c-border-md)' : allValid ? 'var(--c-green)' : 'var(--c-border-md)',
+                  color: allValid && !uploading ? 'white' : 'var(--c-faint)',
+                  fontSize: 13, fontWeight: 500, cursor: uploading || !allValid ? 'not-allowed' : 'pointer',
+                }}>{uploading ? t('_create_submitting') : isEdit ? t('_create_submit_edit') : isRelist ? t('_create_submit_relist') : t('_create_submit')}
                 </button>
               }
             </div>

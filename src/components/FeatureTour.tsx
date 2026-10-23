@@ -90,10 +90,10 @@ export function FeatureTour({ open, onClose }: Props) {
         maxHeight: window.innerWidth < 768 ? '100dvh' : '90vh',
         height: window.innerWidth < 768 ? '100dvh' : undefined,
         background: 'var(--c-surface)',
-        borderRadius: window.innerWidth < 768 ? 0 : 16,
+        borderRadius: window.innerWidth < 768 ? 0 : 6,
         display: 'flex', flexDirection: 'column',
         overflow: 'hidden',
-        boxShadow: window.innerWidth < 768 ? 'none' : '0 24px 80px rgba(0,0,0,0.4)',
+        boxShadow: window.innerWidth < 768 ? 'none' : '6px 6px 0 var(--c-text)',
         position: 'relative',
       }}>
         {/* Close button */}
@@ -173,7 +173,7 @@ export function FeatureTour({ open, onClose }: Props) {
         }}>
           <div style={{
             background: 'var(--c-bg)', color: 'var(--c-faint)',
-            fontSize: 11, fontWeight: 600, padding: '2px 10px', borderRadius: 10,
+            fontSize: 11, fontWeight: 600, padding: '2px 10px', borderRadius: 4,
           }}>
             {slideIdx + 1} / {total}
           </div>
@@ -188,7 +188,7 @@ export function FeatureTour({ open, onClose }: Props) {
             {FEATURE_SLIDES.map((_, i) => (
               <button key={i} onClick={() => setSlideIdx(i)}
                 style={{
-                  width: i === slideIdx ? 20 : 7, height: 7, borderRadius: 4, border: 'none',
+                  width: i === slideIdx ? 20 : 7, height: 7, borderRadius: 2, border: 'none',
                   background: i === slideIdx ? 'var(--c-accent)' : 'var(--c-border-md)',
                   cursor: 'pointer', padding: 0, transition: 'all 0.2s',
                 }} />
@@ -218,7 +218,7 @@ export function FeatureTour({ open, onClose }: Props) {
           }}>
             <button onClick={prev}
               style={{
-                padding: '8px 16px', border: '1px solid var(--c-border)', borderRadius: 8,
+                padding: '8px 16px', border: '1px solid var(--c-border)', borderRadius: 3,
                 background: 'var(--c-surface)', color: 'var(--c-text)', fontSize: 12,
                 cursor: 'pointer', opacity: total > 1 ? 1 : 0.3, pointerEvents: total > 1 ? 'auto' : 'none',
               }}>
@@ -227,8 +227,8 @@ export function FeatureTour({ open, onClose }: Props) {
             {slideIdx < total - 1 ? (
               <button onClick={next}
                 style={{
-                  padding: '8px 20px', border: 'none', borderRadius: 8,
-                  background: 'var(--c-accent)', color: 'white', fontSize: 12, fontWeight: 500,
+                  padding: '8px 20px', border: 'none', borderRadius: 3,
+                  background: 'var(--c-action)', color: 'white', fontSize: 12, fontWeight: 500,
                   cursor: 'pointer',
                 }}>
                 {t('_tour_next')} →
@@ -236,7 +236,7 @@ export function FeatureTour({ open, onClose }: Props) {
             ) : (
               <button onClick={onClose}
                 style={{
-                  padding: '8px 20px', border: 'none', borderRadius: 8,
+                  padding: '8px 20px', border: 'none', borderRadius: 3,
                   background: 'var(--c-green)', color: 'white', fontSize: 12, fontWeight: 500,
                   cursor: 'pointer',
                 }}>

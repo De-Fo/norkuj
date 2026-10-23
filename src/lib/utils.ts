@@ -58,8 +58,9 @@ export async function convertHeicToJpeg(file: File): Promise<File> {
  */
 export function compressImage(file: File, maxDimension = 1920, quality = 0.8): Promise<File> {
   return new Promise((resolve, reject) => {
-    // Skip non-image files or already-small images (no compression needed for <1MB)
-    if (!file.type.startsWith('image/') || file.size < 1_000_000) {
+    // Skip non-image files or already-small images. The listing-images bucket rejects
+    // files over 2MB server-side, so anything above 1.5MB must be re-encoded below.
+    if (!file.type.startsWith('image/') || file.size < 1_500_000) {
       resolve(file)
       return
     }
@@ -69,7 +70,7 @@ export function compressImage(file: File, maxDimension = 1920, quality = 0.8): P
     img.onload = () => {
       URL.revokeObjectURL(url)
       let { width, height } = img
-      if (width <= maxDimension && height <= maxDimension && file.size < 5_000_000) {
+      if (width <= maxDimension && height <= maxDimension && file.size < 1_500_000) {
         resolve(file)
         return
       }
@@ -84,12 +85,20 @@ export function compressImage(file: File, maxDimension = 1920, quality = 0.8): P
       canvas.height = height
       const ctx = canvas.getContext('2d')
       if (!ctx) { resolve(file); return }
+      // JPEG has no alpha: paint white first so transparent PNGs don't turn black
+      ctx.fillStyle = '#fff'
+      ctx.fillRect(0, 0, width, height)
       ctx.drawImage(img, 0, 0, width, height)
-      canvas.toBlob((blob) => {
-        if (!blob) { resolve(file); return }
-        const compressed = new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' })
-        resolve(compressed)
-      }, 'image/jpeg', quality)
+      // The bucket rejects files over 2MB, so step the quality down until the result fits.
+      const LIMIT = 1_900_000
+      const attempt = (q: number) => {
+        canvas.toBlob((blob) => {
+          if (!blob) { resolve(file); return }
+          if (blob.size > LIMIT && q > 0.4) { attempt(Math.round((q - 0.1) * 10) / 10); return }
+          resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }))
+        }, 'image/jpeg', q)
+      }
+      attempt(quality)
     }
     img.onerror = () => reject(new Error('Image load failed'))
     img.src = url

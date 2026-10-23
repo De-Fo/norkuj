@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Bell } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { SearchFilters, PropertyType } from '../lib/types'
 import { DEFAULT_FILTERS, PROPERTY_TYPE_LABELS, PRAGUE_DISTRICTS } from '../lib/types'
@@ -17,8 +18,8 @@ interface Props {
   loading: boolean
   isMobile?: boolean
   onSaveFilters?: () => void
-  requiredMaxPrice?: boolean   // watch-cat composer: price cap is mandatory (search stays optional)
-  requiresMin?: boolean        // watch-cat composer: a high maxPrice needs a minPrice
+  requiredMaxPrice?: boolean   // notification composer: price cap is mandatory (search stays optional)
+  requiresMin?: boolean        // notification composer: a high maxPrice needs a minPrice
   minPrice?: number            // current minPrice — used to decide when to show the requiresMin hint
 }
 
@@ -33,11 +34,11 @@ function Chip({ active, onClick, children, color, isMobile }: {
   return (
     <button onClick={onClick} style={{
       display: 'flex', alignItems: 'center', gap: 4,
-      padding: `${tPad}px ${isMobile ? 14 : 10}px`, borderRadius: 20, cursor: 'pointer',
+      padding: `${tPad}px ${isMobile ? 14 : 10}px`, borderRadius: 3, cursor: 'pointer',
       border: active ? 'none' : '1px solid var(--c-border)',
       background: active ? (color ?? 'var(--c-accent)') : 'var(--c-surface)',
-      color: active ? '#fff' : 'var(--c-muted)',
-      fontSize: 12, fontWeight: active ? 500 : 400,
+      color: active ? (color ? '#fff' : 'var(--c-on-accent)') : 'var(--c-text-secondary)',
+      fontSize: 12, fontWeight: active ? 700 : 500,
       whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.12s',
     }}>
       {children}
@@ -87,14 +88,14 @@ export function FilterPanel({ filters, onChange, resultCount, loading, isMobile,
         <span style={{ fontSize: 12, color: 'var(--c-text)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {summary || t('search_hint')}
         </span>
-        <span style={{ fontSize: 11, color: 'var(--c-muted)' }}>
+        <span className="num" style={{ fontSize: 12, color: 'var(--c-muted)', whiteSpace: 'nowrap' }}>
           {loading ? t('loading') : `${resultCount} ${t('listings_count')}`}
         </span>
         <span style={{
-          fontSize: 13, color: 'var(--c-accent, #2563eb)', fontWeight: 600, whiteSpace: 'nowrap',
-          padding: '7px 14px', borderRadius: 8,
-          background: expanded ? 'rgba(37,99,235,0.12)' : 'rgba(37,99,235,0.06)',
-          border: '1px solid rgba(37,99,235,0.28)',
+          fontSize: 13, color: 'var(--c-accent)', fontWeight: 600, whiteSpace: 'nowrap',
+          padding: '7px 14px', borderRadius: 3,
+          background: expanded ? 'color-mix(in srgb, var(--c-accent) 12%, transparent)' : 'color-mix(in srgb, var(--c-accent) 6%, transparent)',
+          border: '1px solid color-mix(in srgb, var(--c-accent) 28%, transparent)',
           boxShadow: expanded ? 'none' : '0 1px 2px rgba(0,0,0,0.06)',
         }}>
           {expanded ? '▲ ' + t('hide_label') : '▼ ' + t('filters_label')}{activeCount > 0 ? ` (${activeCount})` : ''}
@@ -110,11 +111,11 @@ export function FilterPanel({ filters, onChange, resultCount, loading, isMobile,
           overflow: 'hidden',
           minHeight: 0,
         }}>
-          <div style={{ padding: expanded ? '0 12px 14px' : '0 12px', display: 'flex', flexDirection: 'column', gap: 14, maxHeight: isMobile ? '50vh' : '35vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <div style={{ padding: expanded ? '0 12px 14px' : '0 12px', display: 'flex', flexDirection: 'column', gap: 14, maxHeight: isMobile ? '46vh' : '31vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
 
           {/* Toggle switch for map-area filtering, inline with its label. On mobile
               the save-filters button drops below it so it can't crowd the slider. */}
-          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 8 : 0, padding: '8px 10px', borderRadius: 9 }}>
+          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 8 : 0, padding: '8px 10px', borderRadius: 4 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--c-text)', whiteSpace: 'nowrap' }}>
                 {t('map_filter_label')}
@@ -122,8 +123,8 @@ export function FilterPanel({ filters, onChange, resultCount, loading, isMobile,
               <div role="switch" aria-checked={filters.filterByMapArea} aria-label={t('map_filter_label')}
                 onClick={() => set({ filterByMapArea: !filters.filterByMapArea })}
                 style={{
-                  width: 38, height: 22, borderRadius: 11, cursor: 'pointer',
-                  background: filters.filterByMapArea ? 'var(--c-accent, #2563eb)' : 'var(--c-border-md)',
+                  width: 38, height: 22, borderRadius: 4, cursor: 'pointer',
+                  background: filters.filterByMapArea ? 'var(--c-accent)' : 'var(--c-border-md)',
                   position: 'relative', transition: 'background 0.2s', flexShrink: 0,
                 }}>
                 <div style={{
@@ -135,11 +136,11 @@ export function FilterPanel({ filters, onChange, resultCount, loading, isMobile,
             </div>
             {onSaveFilters && (
               <button onClick={onSaveFilters} style={{
-                marginLeft: isMobile ? 0 : 'auto', padding: '6px 12px', border: 'none', borderRadius: 8, cursor: 'pointer',
-                background: 'var(--c-accent, #2563eb)', color: '#fff', fontSize: 12, fontWeight: 500,
+                marginLeft: isMobile ? 0 : 'auto', padding: '6px 12px', border: 'none', borderRadius: 3, cursor: 'pointer',
+                background: 'var(--c-action)', color: '#fff', fontSize: 12, fontWeight: 500,
                 display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap', flexShrink: 0, alignSelf: 'flex-start',
               }}>
-                🐱 {t('watchcats_save_filters')}
+                <Bell size={13} /> {t('notifications_save_filters')}
               </button>
             )}
           </div>
@@ -190,14 +191,14 @@ export function FilterPanel({ filters, onChange, resultCount, loading, isMobile,
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
               <input type="number" min={0} max={999999} placeholder={lang === 'en' ? 'from' : 'od'} value={filters.minPrice || ''}
                 onChange={e => set({ minPrice: parseInt(e.target.value) || 0 })}
-                style={{ width: 72, padding: '4px 7px', border: '1px solid var(--c-border)', borderRadius: 6, fontSize: 12, outline: 'none', color: 'var(--c-text)', background: 'var(--c-surface)' }} />
+                style={{ width: 72, padding: '4px 7px', border: '1px solid var(--c-border)', borderRadius: 3, fontSize: 12, outline: 'none', color: 'var(--c-text)', background: 'var(--c-surface)' }} />
               <span style={{ fontSize: 11, color: 'var(--c-faint)' }}>—</span>
               <input type="number" min={0} max={999999} placeholder={lang === 'en' ? 'to' : 'do'} value={filters.maxPrice || ''}
                 onChange={e => set({ maxPrice: parseInt(e.target.value) || 0 })}
-                style={{ width: 72, padding: '4px 7px', border: '1px solid var(--c-border)', borderRadius: 6, fontSize: 12, outline: 'none', color: 'var(--c-text)', background: 'var(--c-surface)' }} />
+                style={{ width: 72, padding: '4px 7px', border: '1px solid var(--c-border)', borderRadius: 3, fontSize: 12, outline: 'none', color: 'var(--c-text)', background: 'var(--c-surface)' }} />
             </div>
             {requiresMin && (minPrice ?? 0) === 0 && (
-              <div style={{ marginTop: 6, fontSize: 11, color: 'var(--c-red, #dc2626)' }}>{t('watchcats_min_price_required')}</div>
+              <div style={{ marginTop: 6, fontSize: 11, color: 'var(--c-red, #dc2626)' }}>{t('notifications_min_price_required')}</div>
             )}
           </Section>
 
@@ -220,7 +221,7 @@ export function FilterPanel({ filters, onChange, resultCount, loading, isMobile,
             {activeCount > 0 && (
               <button onClick={() => onChange(DEFAULT_FILTERS)} style={{
                 padding: '4px 10px', background: 'transparent',
-                border: '1px solid var(--c-border)', borderRadius: 6, fontSize: 11,
+                border: '1px solid var(--c-border)', borderRadius: 3, fontSize: 11,
                 color: 'var(--c-muted)', cursor: 'pointer',
               }}>
                 {t('reset_label')}

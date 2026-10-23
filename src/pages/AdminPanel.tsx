@@ -39,6 +39,7 @@ const STATUS_COLORS: Record<string, string> = {
   rejected:       '#dc2626',
   draft:          '#94a3b8',
   deleted:        '#94a3b8',
+  expired:        '#8a5a00',
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -47,6 +48,7 @@ const STATUS_LABELS: Record<string, string> = {
   rejected:       '_admin_status_rejected',
   draft:          '_admin_status_draft',
   deleted:        '_admin_status_deleted',
+  expired:        '_admin_status_expired',
 }
 
 export function AdminPanel({ onClose }: { onClose: () => void }) {
@@ -257,10 +259,10 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
 
   if (isAdmin === false) return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 70 }}>
-      <div style={{ background: 'var(--c-surface)', borderRadius: 12, padding: 32, textAlign: 'center', maxWidth: 320 }}>
+      <div style={{ background: 'var(--c-surface)', borderRadius: 5, padding: 32, textAlign: 'center', maxWidth: 320 }}>
         <div style={{ fontSize: 40, marginBottom: 12 }}>🔒</div>
         <p style={{ fontSize: 15, marginBottom: 16, color: 'var(--c-text)' }}>{t('_admin_no_access')}</p>
-        <button onClick={onClose} style={{ padding: '8px 20px', border: '1px solid var(--c-border)', borderRadius: 8, background: 'var(--c-surface)', cursor: 'pointer', color: 'var(--c-text)' }}>{t('_admin_close')}</button>
+        <button onClick={onClose} style={{ padding: '8px 20px', border: '1px solid var(--c-border)', borderRadius: 3, background: 'var(--c-surface)', cursor: 'pointer', color: 'var(--c-text)' }}>{t('_admin_close')}</button>
       </div>
     </div>
   )
@@ -275,14 +277,14 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
   ]
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 70, padding: window.innerWidth < 768 ? 0 : 16 }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 70, padding: window.innerWidth < 768 ? 0 : 6 }}>
       <div style={{
         width: '100%', maxWidth: 1100,
         height: window.innerWidth < 768 ? '100%' : '90vh',
         background: 'var(--c-bg)',
-        borderRadius: window.innerWidth < 768 ? 0 : 16,
+        borderRadius: window.innerWidth < 768 ? 0 : 6,
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
-        boxShadow: window.innerWidth < 768 ? 'none' : '0 24px 64px rgba(0,0,0,0.35)',
+        boxShadow: window.innerWidth < 768 ? 'none' : '6px 6px 0 var(--c-text)',
       }}>
 
         {/* Header */}
@@ -292,7 +294,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
             <div style={{ display: 'flex', gap: 6 }}>
               {TABS.map(t => (
                 <button key={t.key} onClick={() => { setTab(t.key); setSelected(null) }} style={{
-                  padding: '5px 12px', borderRadius: 20, border: 'none', cursor: 'pointer',
+                  padding: '5px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
                   background: tab === t.key ? t.color : 'var(--c-bg)',
                   color: tab === t.key ? 'white' : 'var(--c-muted)',
                   fontSize: 12, fontWeight: tab === t.key ? 600 : 400,
@@ -305,7 +307,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {actionMsg && (
-              <span style={{ fontSize: 12, color: 'var(--c-green)', background: 'color-mix(in srgb, var(--c-green) 20%, transparent)', padding: '4px 10px', borderRadius: 6 }}>
+              <span style={{ fontSize: 12, color: 'var(--c-green)', background: 'color-mix(in srgb, var(--c-green) 20%, transparent)', padding: '4px 10px', borderRadius: 3 }}>
                 {actionMsg}
               </span>
             )}
@@ -347,11 +349,11 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
                   <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--c-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
                     {l.title}
                   </div>
-                  <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 10, background: STATUS_COLORS[l.status] + '22', color: STATUS_COLORS[l.status], fontWeight: 600, flexShrink: 0 }}>
+                  <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 4, background: STATUS_COLORS[l.status] + '22', color: STATUS_COLORS[l.status], fontWeight: 600, flexShrink: 0 }}>
                     {t(STATUS_LABELS[l.status])}
                   </span>
                   {l.relisted_from && (
-                    <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 10, background: 'rgba(37,99,235,0.12)', color: '#2563eb', fontWeight: 600, flexShrink: 0, marginLeft: 4 }}>
+                    <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 4, background: 'color-mix(in srgb, var(--c-accent) 12%, transparent)', color: 'var(--c-accent)', fontWeight: 600, flexShrink: 0, marginLeft: 4 }}>
                       ↻ {t('_admin_relisted')}
                     </span>
                   )}
@@ -378,7 +380,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
                 <button onClick={() => setSelected(null)}
                   style={{
                     alignSelf: 'flex-start', padding: '8px 14px', border: '1px solid var(--c-border)',
-                    borderRadius: 8, background: 'var(--c-surface)', cursor: 'pointer', fontSize: 13, color: 'var(--c-text)',
+                    borderRadius: 3, background: 'var(--c-surface)', cursor: 'pointer', fontSize: 13, color: 'var(--c-text)',
                   }}>
                   ← {t('_admin_select_prompt').replace('Vyber inzerát ze seznamu','Zpět na seznam').replace('Select a listing from the list','Back to list')}
                 </button>
@@ -387,11 +389,11 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
               {selected.image_paths.length > 0 && (
                 <div>
                   {/* Main viewer */}
-                  <div style={{ height: 260, borderRadius: 10, overflow: 'hidden', cursor: 'pointer', position: 'relative' }}
+                  <div style={{ height: 260, borderRadius: 4, overflow: 'hidden', cursor: 'pointer', position: 'relative' }}
                     onClick={() => { setActiveImg(activeImg); setLightboxOpen(true) }}>
                     <img src={getImageUrl(selected.image_paths[activeImg % selected.image_paths.length])} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     {selected.image_paths.length > 1 && (
-                      <div style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 11, padding: '3px 9px', borderRadius: 10 }}>
+                      <div style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 11, padding: '3px 9px', borderRadius: 4 }}>
                         {activeImg + 1} / {selected.image_paths.length}
                       </div>
                     )}
@@ -402,7 +404,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
                       <img key={i} src={getImageUrl(path)} alt=""
                         onClick={() => setActiveImg(i)}
                         onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-                        style={{ width: 56, height: 48, objectFit: 'cover', borderRadius: 6, cursor: 'pointer', border: i === activeImg ? '2px solid var(--c-accent)' : '1px solid var(--c-border)', opacity: i === activeImg ? 1 : 0.6, transition: 'all 0.15s' }} />
+                        style={{ width: 56, height: 48, objectFit: 'cover', borderRadius: 3, cursor: 'pointer', border: i === activeImg ? '2px solid var(--c-accent)' : '1px solid var(--c-border)', opacity: i === activeImg ? 1 : 0.6, transition: 'all 0.15s' }} />
                     ))}
                   </div>
                 </div>
@@ -415,7 +417,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
                 </p>
               </div>
 
-              <div style={{ padding: '14px 16px', background: 'var(--c-surface)', borderRadius: 8, border: '1px solid var(--c-border)', fontSize: 13.5, lineHeight: 1.75, maxHeight: 480, minHeight: 120, flexShrink: 0, overflow: 'auto', color: 'var(--c-text)', whiteSpace: 'pre-wrap' }}>
+              <div style={{ padding: '14px 16px', background: 'var(--c-surface)', borderRadius: 3, border: '1px solid var(--c-border)', fontSize: 13.5, lineHeight: 1.75, maxHeight: 480, minHeight: 120, flexShrink: 0, overflow: 'auto', color: 'var(--c-text)', whiteSpace: 'pre-wrap' }}>
                 {selected.description}
               </div>
 
@@ -431,7 +433,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
                   [t('_admin_detail_id'),      selected.id.slice(0, 8) + '...'],
                   [t('_admin_detail_photos'),  `${selected.image_paths.length} ks`],
                 ].map(([k, v]) => (
-                  <div key={k} style={{ padding: '8px 10px', background: 'var(--c-surface)', borderRadius: 6, border: '1px solid var(--c-border)' }}>
+                  <div key={k} style={{ padding: '8px 10px', background: 'var(--c-surface)', borderRadius: 3, border: '1px solid var(--c-border)' }}>
                     <div style={{ color: 'var(--c-faint)', marginBottom: 2, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{k}</div>
                     <div style={{ fontWeight: 500, color: 'var(--c-text)' }}>{v}</div>
                   </div>
@@ -445,7 +447,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
                   <button
                     onClick={() => approve(selected.id)}
                     disabled={acting}
-                    style={{ padding: '11px 0', background: acting ? 'color-mix(in srgb, var(--c-green) 60%, transparent)' : 'var(--c-green)', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: acting ? 'not-allowed' : 'pointer' }}
+                    style={{ padding: '11px 0', background: acting ? 'color-mix(in srgb, var(--c-green) 60%, transparent)' : 'var(--c-green)', color: 'white', border: 'none', borderRadius: 3, fontSize: 14, fontWeight: 600, cursor: acting ? 'not-allowed' : 'pointer' }}
                   >
                     {acting ? t('_admin_approve_acting') : t('_admin_approve')}
                   </button>
@@ -455,7 +457,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
                   <button
                     onClick={() => republishL(selected.id)}
                     disabled={acting}
-                    style={{ padding: '11px 0', background: acting ? 'color-mix(in srgb, var(--c-green) 60%, transparent)' : 'var(--c-green)', color: 'white', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: acting ? 'not-allowed' : 'pointer' }}
+                    style={{ padding: '11px 0', background: acting ? 'color-mix(in srgb, var(--c-green) 60%, transparent)' : 'var(--c-green)', color: 'white', border: 'none', borderRadius: 3, fontSize: 14, fontWeight: 600, cursor: acting ? 'not-allowed' : 'pointer' }}
                   >
                     {acting ? t('_admin_republish_acting') : t('_admin_republish')}
                   </button>
@@ -467,12 +469,12 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
                       placeholder={t('_admin_reject_label')}
                       value={rejectReason}
                       onChange={e => setRejectReason(e.target.value)}
-                      style={{ flex: 1, padding: '9px 11px', border: '1px solid var(--c-border)', borderRadius: 8, fontSize: 13, outline: 'none', background: 'var(--c-surface)', color: 'var(--c-text)' }}
+                      style={{ flex: 1, padding: '9px 11px', border: '1px solid var(--c-border)', borderRadius: 3, fontSize: 13, outline: 'none', background: 'var(--c-surface)', color: 'var(--c-text)' }}
                     />
                     <button
                       onClick={() => reject(selected.id)}
                       disabled={acting || !rejectReason.trim()}
-                      style={{ padding: '9px 16px', background: 'var(--c-red)', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: acting ? 'not-allowed' : 'pointer', opacity: !rejectReason.trim() ? 0.5 : 1 }}
+                      style={{ padding: '9px 16px', background: 'var(--c-red)', color: 'white', border: 'none', borderRadius: 3, fontSize: 13, fontWeight: 500, cursor: acting ? 'not-allowed' : 'pointer', opacity: !rejectReason.trim() ? 0.5 : 1 }}
                     >
                       {t('_admin_reject')}
                     </button>
@@ -483,7 +485,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
                   <button
                     onClick={() => unpublishL(selected.id)}
                     disabled={acting}
-                    style={{ padding: '11px 0', background: 'var(--c-yellow)', color: 'white', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
+                    style={{ padding: '11px 0', background: 'var(--c-yellow)', color: 'white', border: 'none', borderRadius: 3, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
                   >
                     {t('_admin_unpublish')} · notifikace majiteli
                   </button>
@@ -493,7 +495,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
                   <button
                     onClick={() => deleteL(selected.id)}
                     disabled={acting}
-                    style={{ padding: '9px 0', width: '100%', background: 'transparent', color: 'var(--c-red)', border: '1px solid color-mix(in srgb, var(--c-red) 40%, transparent)', borderRadius: 8, fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: acting ? 0.5 : 1 }}
+                    style={{ padding: '9px 0', width: '100%', background: 'transparent', color: 'var(--c-red)', border: '1px solid color-mix(in srgb, var(--c-red) 40%, transparent)', borderRadius: 3, fontSize: 12, fontWeight: 500, cursor: 'pointer', opacity: acting ? 0.5 : 1 }}
                   >
                     🗑 {t('_admin_delete')} — bez notifikace, nevratné
                   </button>
@@ -520,7 +522,7 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
             {selected.image_paths.length > 1 && (
               <button onClick={() => setActiveImg(i => (i - 1 + selected.image_paths.length) % selected.image_paths.length)} style={{ ...navBtn }}>‹</button>
             )}
-            <img src={getImageUrl(selected.image_paths[activeImg % selected.image_paths.length])} alt="" style={{ maxWidth: '100%', maxHeight: '88vh', borderRadius: 8, objectFit: 'contain' }} />
+            <img src={getImageUrl(selected.image_paths[activeImg % selected.image_paths.length])} alt="" style={{ maxWidth: '100%', maxHeight: '88vh', borderRadius: 3, objectFit: 'contain' }} />
             {selected.image_paths.length > 1 && (
               <button onClick={() => setActiveImg(i => (i + 1) % selected.image_paths.length)} style={{ ...navBtn }}>›</button>
             )}

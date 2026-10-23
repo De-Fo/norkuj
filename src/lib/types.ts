@@ -1,5 +1,5 @@
 export type PropertyType = '1+kk' | '1+1' | '2+kk' | '2+1' | '3+kk' | '3+1' | '4+kk' | '4+1' | '5+kk' | '5+1' | '6+kk' | '6+1' | 'atypical' | 'pokoj' | 'sdileny_pokoj'
-export type ListingStatus = 'draft' | 'pending_review' | 'published' | 'rented' | 'rejected' | 'deleted'
+export type ListingStatus = 'draft' | 'pending_review' | 'published' | 'rented' | 'rejected' | 'deleted' | 'expired'
 export type TransitType = 'metro' | 'tram' | 'bus' | 'train'
 export type TransitStatus = 'green' | 'yellow' | 'red' | 'grey'
 
@@ -46,6 +46,7 @@ export interface Listing {
   updated_at: string
   published_at: string | null
   expires_at: string | null
+  expired_at?: string | null
   published_count: number | null   // how many times this property has gone through review (relist history)
   relisted_from: string | null     // the previous (rented/closed) listing this one was created from
   location?: any                   // PostGIS geography POINT — Supabase returns {type:"Point",coordinates:[lng,lat]}
@@ -147,7 +148,7 @@ export const PROPERTY_TYPE_LABELS: Record<PropertyType, string> = {
 }
 
 // A very high price ceiling with (almost) no floor would match nearly every
-// listing — for a push watch-cat that's just alert spam. When someone sets a
+// listing — for a push notification that's just alert spam. When someone sets a
 // ceiling that high, require a real floor, not just "anything non-zero"
 // (admins may watch freely). Below the threshold cost remains fully optional.
 export function requiresMinPrice(f: SearchFilters, isAdmin: boolean): boolean {

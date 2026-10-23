@@ -1,17 +1,22 @@
 @import "tailwindcss";
+@import "@fontsource-variable/archivo/wght.css";
+@import "@fontsource/pixelify-sans/400.css";
+@import "@fontsource/pixelify-sans/700.css";
 
 /* ── Design tokens ─────────────────────────────────────────── */
 :root {
-  --c-bg:        #f4f6f8;
+  /* Paper & ink (editorial, warm off-white page with white cards) */
+  --c-bg:        #f6f5f1;
   --c-surface:   #ffffff;
-  --c-surface-raised: #fafbfc;
-  --c-border:    #e2e8f0;
-  --c-border-md: #cbd5e1;
-  --c-text:      #0f172a;
-  --c-text-secondary: #334155;
-  --c-muted:     #64748b;
-  --c-faint:     #94a3b8;
+  --c-surface-raised: #fbfaf7;
+  --c-border:    #d9d7cf;
+  --c-border-md: #bdbab0;
+  --c-text:      #1a1a1a;
+  --c-text-secondary: #3a3a37;
+  --c-muted:     #5c5c58;
+  --c-faint:     #6b6963;
 
+  /* Status colours (transit + feedback) - unchanged semantics */
   --c-green:     #16a34a;
   --c-green-bg:  #dcfce7;
   --c-green-text:#15803d;
@@ -20,21 +25,38 @@
   --c-yellow-bg: #fef9c3;
   --c-yellow-text:#a16207;
 
-  --c-red:       #dc2626;
+  /* Errors/bans: deeper crimson than the brand red, always paired with an icon/label in the UI */
+  --c-red:       #b91c1c;
   --c-red-bg:    #fee2e2;
-  --c-red-text:  #b91c1c;
+  --c-red-text:  #991b1b;
 
   --c-grey:      #9ca3af;
-  --c-grey-bg:   #f1f5f9;
-  --c-grey-text: #64748b;
+  --c-grey-bg:   #efeee9;
+  --c-grey-text: #5c5c58;
 
-  --c-rk:        #e2001a;
-  --c-accent:    #2563eb;
-  --c-accent-hover: #1d4ed8;
+  /* Brand red. --c-rk = logo only (#fe0818). --c-action = filled buttons (white text 5.5:1).
+     --c-red-ink = red text/icons on the page background (5.0:1). Never use --c-rk under small labels. */
+  --c-rk:        #fe0818;
+  --c-action:    #d4001a;
+  --c-action-hover: #b80016;
+  --c-action-step:  #8a0012;
+  --c-red-ink:   #d4001a;
 
-  --radius-card: 10px;
-  --shadow-card: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-hover:0 4px 12px rgba(0,0,0,0.10);
+  /* Enamel blue: links, selected filters/chips, focus rings. Not red, so "selected" never reads as error or line C. */
+  --c-accent:    #13408a;
+  --c-accent-hover: #0d2f6b;
+  --c-accent-soft:  #e6edf8;
+  --c-on-accent: #ffffff;
+
+  --radius-card: 4px;
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --shadow-card: 0 1px 0 rgba(26,26,26,0.04);
+  --shadow-hover:0 2px 0 rgba(26,26,26,0.12);
+
+  --font-body: 'Archivo Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-pixel: 'Pixelify Sans', 'Archivo Variable', monospace;
 
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -43,27 +65,37 @@
 }
 
 [data-theme="dark"] {
-  --c-bg: #0f1117;
-  --c-surface: #1a1d27;
-  --c-surface-raised: #22252f;
-  --c-border: #2a2d3a;
-  --c-border-md: #3a3d4a;
-  --c-text: #e8eaf0;
-  --c-text-secondary: #c8cad0;
-  --c-muted: #9497a5;
-  --c-faint: #6a6d7a;
-  --c-accent: #3b82f6;
-  --c-accent-hover: #60a5fa;
+  --c-bg: #0e0e0f;
+  --c-surface: #17171a;
+  --c-surface-raised: #1d1d21;
+  --c-border: #2c2c30;
+  --c-border-md: #3d3d42;
+  --c-text: #ecebe6;
+  --c-text-secondary: #cfcec8;
+  --c-muted: #a3a29c;
+  --c-faint: #8a8982;
+  --c-grey-bg: #222226;
+  --c-grey-text: #a3a29c;
   --c-green: #22c55e;
   --c-yellow: #eab308;
-  --c-red: #ef4444;
-  --c-rk: #ff4455;
+  --c-red: #f87171;
+  --c-red-bg: #3a1417;
+  --c-red-text: #fca5a5;
+  --c-rk: #fe0818;
+  --c-red-ink: #fe0818;
+  --c-action-hover: #ea0a22;
+  --c-accent: #8fb3ff;
+  --c-accent-hover: #b4cdff;
+  --c-accent-soft: #15233d;
+  --c-on-accent: #0e0e0f;
+  --shadow-card: 0 1px 0 rgba(0,0,0,0.4);
+  --shadow-hover:0 2px 0 rgba(0,0,0,0.5);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: var(--font-body);
   background: var(--c-bg);
   color: var(--c-text);
   -webkit-font-smoothing: antialiased;
@@ -72,11 +104,81 @@ body {
 
 /* mapLibre overrides */
 .maplibregl-map { font-family: inherit; }
-.maplibregl-ctrl-group { border: 0.5px solid var(--c-border) !important; box-shadow: var(--shadow-card) !important; border-radius: 8px !important; }
-.maplibregl-ctrl button { border-radius: 7px !important; }
+.maplibregl-ctrl-group { border: 0.5px solid var(--c-border) !important; box-shadow: var(--shadow-card) !important; border-radius: 4px !important; }
+.maplibregl-ctrl button { border-radius: 3px !important; }
 
 /* selection */
-::selection { background: var(--c-accent); color: white; }
+::selection { background: var(--c-accent); color: var(--c-on-accent); }
+
+/* keyboard focus: visible everywhere, enamel blue */
+:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 2px; }
+
+/* numbers that line up (prices, areas, counts) */
+.num { font-variant-numeric: tabular-nums; }
+/* retro accent: use sparingly (status stamps, result count, footer) */
+.pixel { font-family: var(--font-pixel); letter-spacing: 0.02em; }
+/* header controls: quiet ghost buttons (no outline), clear hover; primary actions use .btn-action */
+header button:not(.btn-action):not(.btn-hard), header select {
+  background: transparent; border: 1px solid transparent; color: var(--c-text-secondary); cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+header button:not(.btn-action):not(.btn-hard):hover, header select:hover { background: var(--c-bg); color: var(--c-text); border-color: var(--c-border); }
+header .btn-hard {
+  height: 32px; padding: 0 14px; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--c-surface); color: var(--c-text); border: 2px solid var(--c-text); border-radius: 3px; cursor: pointer;
+  box-shadow: 3px 3px 0 var(--c-text); transition: transform 0.06s, box-shadow 0.06s;
+}
+header .btn-hard:hover { background: var(--c-bg); }
+header .btn-hard:active { transform: translate(3px, 3px); box-shadow: 0 0 0 var(--c-text); }
+header .btn-hard.btn-hard-red { background: var(--c-action); color: #fff; border-color: var(--c-text); }
+header .btn-hard.btn-hard-red:hover { background: var(--c-action-hover); }
+@media (prefers-reduced-motion: reduce) { header .btn-hard { transition: none; } }
+header .btn-action { height: 32px; padding: 0 14px; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; }
+/* list/map divider: a 2px ink rule with a wider invisible grab area.
+   On hover/focus/drag it turns enamel blue and shows a small grip in the middle. */
+.panel-divider { position: relative; flex: 0 0 2px; width: 2px; background: var(--c-text); cursor: col-resize; touch-action: none; z-index: 6; transition: background 0.15s; }
+.panel-divider::before { content: ''; position: absolute; top: 0; bottom: 0; left: -5px; right: -5px; }
+.panel-divider::after {
+  content: ''; position: absolute; top: 50%; left: 50%; width: 12px; height: 44px; transform: translate(-50%, -50%);
+  /* inverted from the page: ink handle with paper dots (light mode); the reverse in dark mode */
+  background-color: var(--c-text); border: 1px solid var(--c-text); border-radius: 6px;
+  background-image: radial-gradient(circle, var(--c-bg) 1.2px, transparent 1.6px);
+  background-size: 6px 9px; background-position: center; background-repeat: repeat-y;
+  opacity: 0.55; transition: opacity 0.18s;
+}
+/* dark mode: paper handle with ink dots, and quieter so it does not glare */
+[data-theme="dark"] .panel-divider::after { opacity: 0.35; }
+.panel-divider:hover, .panel-divider:focus-visible, body.is-resizing .panel-divider { background: var(--c-accent); }
+.panel-divider:hover::after, .panel-divider:focus-visible::after, body.is-resizing .panel-divider::after,
+[data-theme="dark"] .panel-divider:hover::after, [data-theme="dark"] .panel-divider:focus-visible::after, [data-theme="dark"] body.is-resizing .panel-divider::after { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .panel-divider, .panel-divider::after { transition: none; } }
+/* sort dropdown: clearly a control (white field, strong text, visible chevron), not tiny grey text */
+.sort-select {
+  appearance: none; -webkit-appearance: none;
+  padding: 4px 30px 4px 10px; font: inherit; font-size: 13px; font-weight: 600; color: var(--c-text);
+  background-color: var(--c-surface); border: 1px solid var(--c-border-md); border-radius: 3px; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%231a1a1a' stroke-width='2' stroke-linecap='square'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center;
+}
+[data-theme="dark"] .sort-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23ecebe6' stroke-width='2' stroke-linecap='square'/%3E%3C/svg%3E");
+}
+.sort-select:hover { border-color: var(--c-text); }
+/* listing cards: flat, with a hard offset on hover (no soft shadow) */
+.listing-card { transition: transform 0.08s, box-shadow 0.08s; }
+.listing-card:hover { transform: translate(-1px, -1px); box-shadow: 2px 2px 0 var(--c-border-md); }
+.listing-card[data-highlighted] { box-shadow: 3px 3px 0 var(--c-accent); }
+@media (prefers-reduced-motion: reduce) { .listing-card { transition: none; } .listing-card:hover { transform: none; } }
+/* primary action button: flat red with a hard 2px step instead of a soft shadow */
+.btn-action {
+  background: var(--c-action); color: #fff; border: none; border-radius: var(--radius-sm);
+  box-shadow: 0 2px 0 var(--c-action-step); font-weight: 700; cursor: pointer;
+  transition: transform 0.06s, box-shadow 0.06s, background 0.12s;
+}
+.btn-action:hover:not(:disabled) { background: var(--c-action-hover); }
+.btn-action:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 0 0 var(--c-action-step); }
+.btn-action:disabled { background: var(--c-border-md); color: var(--c-faint); box-shadow: none; cursor: not-allowed; }
+@media (prefers-reduced-motion: reduce) { .btn-action { transition: none; } }
 
 /* layout helpers */
 @media (max-width: 767px) {
